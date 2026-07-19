@@ -1,0 +1,13 @@
+{
+  "name": "gas-sponsor-ledger",
+  "private": true,
+  "scripts": {
+    "dev": "npm run dev --prefix apps/web",
+    "build": "npm run build --prefix apps/web",
+    "lint": "npm run lint --prefix apps/web",
+    "compile": "npm run compile --prefix contracts",
+    "test:contracts": "npm test --prefix contracts",
+    "deploy:local": "npm run deploy:local --prefix contracts",
+    "deploy:monad": "npm run deploy:monadTestnet --prefix contracts"
+  }
+}
