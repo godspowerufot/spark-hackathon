@@ -8,3 +8,4 @@ error InsufficientTreasury();
 error InvalidMaxClaim();
 error TransferFailed();
 error NotOwner();
+error NotRelayer();

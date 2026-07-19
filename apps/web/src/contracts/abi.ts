@@ -1,4 +1,4 @@
-export const gasSponsorLedgerAbi =  [
+export const gasSponsorLedgerAbi = [
   {
     "inputs": [
       {
@@ -38,6 +38,11 @@ export const gasSponsorLedgerAbi =  [
   {
     "inputs": [],
     "name": "InvalidMaxClaim",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "NotRelayer",
     "type": "error"
   },
   {
@@ -183,6 +188,25 @@ export const gasSponsorLedgerAbi =  [
       {
         "indexed": true,
         "internalType": "address",
+        "name": "oldRelayer",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newRelayer",
+        "type": "address"
+      }
+    ],
+    "name": "RelayerUpdated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
         "name": "sponsor",
         "type": "address"
       },
@@ -262,6 +286,19 @@ export const gasSponsorLedgerAbi =  [
   {
     "inputs": [],
     "name": "claim",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "recipient",
+        "type": "address"
+      }
+    ],
+    "name": "claimFor",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -408,6 +445,19 @@ export const gasSponsorLedgerAbi =  [
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "relayer",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "uint256",
@@ -416,6 +466,19 @@ export const gasSponsorLedgerAbi =  [
       }
     ],
     "name": "setMaxClaimAmount",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "newRelayer",
+        "type": "address"
+      }
+    ],
+    "name": "setRelayer",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -514,4 +577,4 @@ export const gasSponsorLedgerAbi =  [
     "stateMutability": "payable",
     "type": "receive"
   }
-]as const
+] as const

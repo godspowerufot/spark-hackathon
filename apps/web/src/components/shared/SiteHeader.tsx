@@ -11,7 +11,6 @@ const links = [
   { href: '/dashboard', label: 'Dashboard' },
   { href: '/sponsor', label: 'Sponsor' },
   { href: '/claim', label: 'Claim' },
-  { href: '/admin', label: 'Admin' },
   { href: '/wallet', label: 'Wallet' },
 ]
 

@@ -1,12 +1,12 @@
-export const APP_NAME = 'Gas Sponsor Ledger'
+export const APP_NAME = 'SparkGas'
 export const APP_TAGLINE = 'Sponsored MON gas for seamless Monad onboarding'
 
-export const DEFAULT_MAX_CLAIM_LABEL = '0.01 MON'
+export const DEFAULT_MAX_CLAIM_LABEL = '0.1 MON'
 
 export const FAQ = [
   {
-    q: 'What is Gas Sponsor Ledger?',
-    a: 'A transparent on-chain vault where sponsors deposit MON so new users can claim gas for their first Monad transactions.',
+    q: 'What is SparkGas?',
+    a: 'A transparent on-chain vault where sponsors deposit MON so new users can claim gas for their first Monad transactions — even with a zero-MON wallet.',
   },
   {
     q: 'Who can claim?',
@@ -14,7 +14,7 @@ export const FAQ = [
   },
   {
     q: 'Is this custodial?',
-    a: 'No. Funds live in the GasSponsorLedger contract. Claims and deposits emit on-chain events for full auditability.',
+    a: 'No. Funds live in the GasSponsorLedger smart contract. Claims and deposits emit on-chain events for full auditability.',
   },
   {
     q: 'Can I claim twice?',

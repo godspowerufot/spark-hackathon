@@ -129,4 +129,57 @@ describe('GasSponsorLedger', () => {
     await ledger.connect(sponsor).deposit({ value: ethers.parseEther('1') })
     expect(await ledger.canClaim(user.address)).to.equal(true)
   })
+
+  it('claimFor: relayer claims for zero-balance recipient', async () => {
+    const { ledger, owner, sponsor, user } = await loadFixture(deployFixture)
+    await ledger.connect(sponsor).deposit({ value: ethers.parseEther('1') })
+
+    const before = await ethers.provider.getBalance(user.address)
+    await expect(ledger.connect(owner).claimFor(user.address))
+      .to.emit(ledger, 'GasClaimed')
+      .withArgs(user.address, MAX_CLAIM, ethers.parseEther('1') - MAX_CLAIM)
+
+    expect(await ethers.provider.getBalance(user.address)).to.equal(before + MAX_CLAIM)
+    expect(await ledger.hasClaimed(user.address)).to.equal(true)
+  })
+
+  it('claimFor: non-relayer reverts', async () => {
+    const { ledger, sponsor, user } = await loadFixture(deployFixture)
+    await ledger.connect(sponsor).deposit({ value: ethers.parseEther('1') })
+
+    await expect(
+      ledger.connect(user).claimFor(user.address),
+    ).to.be.revertedWithCustomError(ledger, 'NotRelayer')
+  })
+
+  it('claimFor: recipient cannot claim twice via any path', async () => {
+    const { ledger, owner, sponsor, user } = await loadFixture(deployFixture)
+    await ledger.connect(sponsor).deposit({ value: ethers.parseEther('1') })
+
+    await ledger.connect(owner).claimFor(user.address)
+    await expect(
+      ledger.connect(owner).claimFor(user.address),
+    ).to.be.revertedWithCustomError(ledger, 'AlreadyClaimed')
+    await expect(ledger.connect(user).claim()).to.be.revertedWithCustomError(
+      ledger,
+      'AlreadyClaimed',
+    )
+  })
+
+  it('setRelayer: owner rotates relayer', async () => {
+    const { ledger, owner, sponsor, user } = await loadFixture(deployFixture)
+    await ledger.connect(sponsor).deposit({ value: ethers.parseEther('1') })
+
+    await expect(ledger.connect(owner).setRelayer(sponsor.address))
+      .to.emit(ledger, 'RelayerUpdated')
+      .withArgs(owner.address, sponsor.address)
+
+    await ledger.connect(sponsor).claimFor(user.address)
+    expect(await ledger.hasClaimed(user.address)).to.equal(true)
+
+    await expect(ledger.connect(user).setRelayer(user.address)).to.be.revertedWithCustomError(
+      ledger,
+      'OwnableUnauthorizedAccount',
+    )
+  })
 })

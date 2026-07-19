@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { parseEther, type Address, type Hex } from 'viem'
 import {
   useAccount,
-  usePublicClient,
   useReadContract,
+  useSignMessage,
   useWaitForTransactionReceipt,
   useWriteContract,
 } from 'wagmi'
@@ -213,8 +213,11 @@ export function useDeposit() {
 export function useClaim() {
   const qc = useQueryClient()
   const { address } = useAccount()
+  const { signMessageAsync } = useSignMessage()
   const { writeContractAsync, data: hash, isPending, reset } = useWriteContract()
   const receipt = useWaitForTransactionReceipt({ hash })
+  const [gaslessHash, setGaslessHash] = useState<Hex | undefined>()
+  const [gaslessPending, setGaslessPending] = useState(false)
 
   useEffect(() => {
     if (!ledgerAddress || !hash) return
@@ -240,7 +243,57 @@ export function useClaim() {
     onError: (e) => toast.error(humanError(e)),
   })
 
-  async function claim() {
+  /**
+   * Gasless path: user signs a free message, server/relayer pays gas and
+   * calls claimFor(recipient). This is how zero-MON wallets actually onboard.
+   */
+  async function claimGasless() {
+    if (!address) {
+      toast.error('Connect wallet first.')
+      return
+    }
+    if (!enabledOnchain || !ledgerAddress) {
+      return demoMutation.mutateAsync()
+    }
+
+    try {
+      setGaslessPending(true)
+      toast.loading('Sign the free claim message in your wallet…', { id: 'claim' })
+
+      const message = [
+        'SparkGas — gasless claim',
+        `Recipient: ${address}`,
+        `Contract: ${ledgerAddress}`,
+        `Chain ID: ${env.chainId}`,
+      ].join('\n')
+
+      const signature = await signMessageAsync({ message })
+      toast.loading('Relayer is submitting your claim (you pay $0 gas)…', { id: 'claim' })
+
+      const res = await fetch('/api/relay-claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipient: address, signature }),
+      })
+      const json = (await res.json()) as { hash?: Hex; error?: string }
+      if (!res.ok || !json.hash) {
+        throw new Error(json.error || 'Gasless claim failed')
+      }
+
+      setGaslessHash(json.hash)
+      await invalidateLedger(qc)
+      toast.success('Gas claimed — MON is in your wallet. No gas paid.', { id: 'claim' })
+      return json.hash
+    } catch (e) {
+      toast.error(humanError(e), { id: 'claim' })
+      throw e
+    } finally {
+      setGaslessPending(false)
+    }
+  }
+
+  /** Fallback: user pays gas themselves (requires existing MON). */
+  async function claimSelfPay() {
     if (enabledOnchain) {
       try {
         if (!ledgerAddress) throw new Error('Ledger not configured')
@@ -258,133 +311,68 @@ export function useClaim() {
         throw e
       }
     }
-
     return demoMutation.mutateAsync()
   }
 
   return {
-    claim,
+    claim: claimGasless,
+    claimSelfPay,
     isPending: enabledOnchain
-      ? isPending || Boolean(hash && receipt.isLoading)
+      ? gaslessPending || isPending || Boolean(hash && receipt.isLoading)
       : demoMutation.isPending,
-    hash,
+    hash: gaslessHash ?? hash,
+    gasless: enabledOnchain,
   }
 }
 
-export function useAdminControls() {
-  const qc = useQueryClient()
-  const { writeContractAsync, data: hash, isPending, reset } = useWriteContract()
-  const receipt = useWaitForTransactionReceipt({ hash })
+interface HistoryApiEvent {
+  kind: 'deposit' | 'claim'
+  actor: string
+  amount: string
+  treasuryBalance: string
+  txHash: string
+  blockNumber: string
+  logIndex: number
+}
 
-  useEffect(() => {
-    if (!ledgerAddress || !hash) return
-    if (receipt.isSuccess) {
-      void invalidateLedger(qc)
-      toast.success('Admin action confirmed.', { id: 'admin' })
-      reset()
-    } else if (receipt.isError) {
-      toast.error('Admin transaction failed.', { id: 'admin' })
-      reset()
-    }
-  }, [hash, qc, receipt.isError, receipt.isSuccess, reset])
+/**
+ * Event history comes from the `/api/history` server route, which scans
+ * logs since the deploy block in provider-safe chunks and caches results.
+ * Free-tier RPCs cap `eth_getLogs` at 10–1000 blocks, so scanning from the
+ * browser directly would either miss old deposits or spam the provider.
+ */
+async function fetchOnchainHistory(): Promise<{
+  deposits: LedgerHistoryItem[]
+  claims: LedgerHistoryItem[]
+}> {
+  const res = await fetch('/api/history', { cache: 'no-store' })
+  if (!res.ok) throw new Error('Failed to load ledger history')
+  const json = (await res.json()) as {
+    deposits: HistoryApiEvent[]
+    claims: HistoryApiEvent[]
+  }
 
-  const demoPause = useMutation({
-    mutationFn: async (paused: boolean) => demoLedger.pause(paused),
-    onSuccess: async () => {
-      await invalidateLedger(qc)
-      toast.success('Pause state updated (demo).')
-    },
-    onError: (e) => toast.error(humanError(e)),
+  const toItem = (e: HistoryApiEvent): LedgerHistoryItem => ({
+    kind: e.kind,
+    actor: e.actor as Address,
+    amount: BigInt(e.amount),
+    treasuryBalance: BigInt(e.treasuryBalance),
+    txHash: e.txHash as Hex,
+    blockNumber: BigInt(e.blockNumber),
+    logIndex: e.logIndex,
   })
 
-  async function setPaused(paused: boolean) {
-    if (enabledOnchain && ledgerAddress) {
-      try {
-        toast.loading(paused ? 'Pausing…' : 'Unpausing…', { id: 'admin' })
-        await writeContractAsync({
-          address: ledgerAddress,
-          abi: gasSponsorLedgerAbi,
-          functionName: paused ? 'pause' : 'unpause',
-        })
-        toast.loading('Waiting for confirmation…', { id: 'admin' })
-      } catch (e) {
-        toast.error(humanError(e), { id: 'admin' })
-      }
-      return
-    }
-    await demoPause.mutateAsync(paused)
-  }
-
   return {
-    setPaused,
-    isPending: enabledOnchain
-      ? isPending || Boolean(hash && receipt.isLoading)
-      : demoPause.isPending,
+    deposits: (json.deposits ?? []).map(toItem),
+    claims: (json.claims ?? []).map(toItem),
   }
-}
-
-async function fetchOnchainHistory(
-  client: NonNullable<ReturnType<typeof usePublicClient>>,
-  address: Address,
-): Promise<{ deposits: LedgerHistoryItem[]; claims: LedgerHistoryItem[] }> {
-  const latest = await client.getBlockNumber()
-  // Alchemy free tier often caps eth_getLogs ranges; keep windows modest.
-  const fromBlock = latest > 4_999n ? latest - 4_999n : 0n
-
-  const [depositLogs, claimLogs] = await Promise.all([
-    client.getContractEvents({
-      address,
-      abi: gasSponsorLedgerAbi,
-      eventName: 'SponsorDeposited',
-      fromBlock,
-      toBlock: latest,
-    }),
-    client.getContractEvents({
-      address,
-      abi: gasSponsorLedgerAbi,
-      eventName: 'GasClaimed',
-      fromBlock,
-      toBlock: latest,
-    }),
-  ])
-
-  const deposits: LedgerHistoryItem[] = depositLogs
-    .map((log) => ({
-      kind: 'deposit' as const,
-      actor: log.args.sponsor as Address,
-      amount: log.args.amount as bigint,
-      treasuryBalance: log.args.treasuryBalance as bigint,
-      txHash: log.transactionHash as Hex,
-      blockNumber: log.blockNumber ?? 0n,
-      logIndex: log.logIndex ?? 0,
-    }))
-    .sort((a, b) => Number(b.blockNumber - a.blockNumber) || b.logIndex - a.logIndex)
-
-  const claims: LedgerHistoryItem[] = claimLogs
-    .map((log) => ({
-      kind: 'claim' as const,
-      actor: log.args.claimer as Address,
-      amount: log.args.amount as bigint,
-      treasuryBalance: log.args.treasuryBalance as bigint,
-      txHash: log.transactionHash as Hex,
-      blockNumber: log.blockNumber ?? 0n,
-      logIndex: log.logIndex ?? 0,
-    }))
-    .sort((a, b) => Number(b.blockNumber - a.blockNumber) || b.logIndex - a.logIndex)
-
-  return { deposits, claims }
 }
 
 export function useLedgerHistory() {
-  const client = usePublicClient()
-
   const onchain = useQuery({
     queryKey: ['gsl', 'onchain', 'history', ledgerAddress],
-    queryFn: async () => {
-      if (!client || !ledgerAddress) return { deposits: [], claims: [] }
-      return fetchOnchainHistory(client, ledgerAddress)
-    },
-    enabled: enabledOnchain && Boolean(client),
+    queryFn: fetchOnchainHistory,
+    enabled: enabledOnchain,
     refetchInterval: 12_000,
   })
 

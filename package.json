@@ -1,5 +1,5 @@
 {
-  "name": "gas-sponsor-ledger",
+  "name": "sparkgas",
   "private": true,
   "scripts": {
     "dev": "npm run dev --prefix apps/web",

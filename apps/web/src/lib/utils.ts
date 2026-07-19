@@ -56,5 +56,14 @@ export function humanError(err: unknown): string {
   ) {
     return 'Network request failed. Disable ad blockers for this site, or retry — RPC may be blocked.'
   }
+  if (lower.includes('user rejected') || lower.includes('denied') || lower.includes('rejected the request')) {
+    return 'Signature or transaction rejected in wallet.'
+  }
+  if (lower.includes('already claimed')) {
+    return 'This wallet has already claimed sponsored gas.'
+  }
+  if (lower.includes('not eligible') || lower.includes('treasury')) {
+    return 'Not eligible right now — check treasury balance or pause status.'
+  }
   return 'Transaction failed. Please try again.'
 }

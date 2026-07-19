@@ -51,14 +51,19 @@ async function main() {
   const address = await ledger.getAddress()
   const owner = await ledger.owner()
   const stats = await ledger.getStats()
+  const deployTx = ledger.deploymentTransaction()
+  const receipt = deployTx ? await deployTx.wait() : null
+  const deployBlock = receipt?.blockNumber ?? 0
 
   console.log('GasSponsorLedger deployed at:', address)
   console.log('Owner:', owner)
+  console.log('Deploy block:', deployBlock)
   console.log('Max claim:', ethers.formatEther(stats[1]), 'MON')
 
   const webEnvPath = path.resolve(__dirname, '../../apps/web/.env.local')
   upsertEnvVar(webEnvPath, 'NEXT_PUBLIC_LEDGER_ADDRESS', address)
-  console.log('Updated', webEnvPath, 'with NEXT_PUBLIC_LEDGER_ADDRESS')
+  upsertEnvVar(webEnvPath, 'NEXT_PUBLIC_LEDGER_DEPLOY_BLOCK', String(deployBlock))
+  console.log('Updated', webEnvPath, 'with NEXT_PUBLIC_LEDGER_ADDRESS + DEPLOY_BLOCK')
 
   const contractsEnvPath = path.resolve(__dirname, '../.env')
   upsertEnvVar(contractsEnvPath, 'LEDGER_ADDRESS', address)

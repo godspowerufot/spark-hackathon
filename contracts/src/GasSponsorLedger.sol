@@ -5,7 +5,15 @@ import {Ownable} from "./vendor/Ownable.sol";
 import {Pausable} from "./vendor/Pausable.sol";
 import {ReentrancyGuard} from "./vendor/ReentrancyGuard.sol";
 
-import {GSLErrors} from "./errors/GSLErrors.sol";
+import {
+    ZeroAddress,
+    ZeroAmount,
+    AlreadyClaimed,
+    InsufficientTreasury,
+    InvalidMaxClaim,
+    TransferFailed,
+    NotRelayer
+} from "./errors/GSLErrors.sol";
 import {IGSLEvents} from "./interfaces/IGSLEvents.sol";
 
 /// @title GasSponsorLedger
@@ -13,36 +21,27 @@ import {IGSLEvents} from "./interfaces/IGSLEvents.sol";
 /// @dev Sponsors deposit native MON. Eligible wallets claim once up to `maxClaimAmount`.
 ///      Follows Checks-Effects-Interactions. Uses low-level `call` for native transfers.
 contract GasSponsorLedger is Ownable, Pausable, ReentrancyGuard, IGSLEvents {
-    /// @notice Maximum MON a single wallet may claim (wei).
     uint256 public maxClaimAmount;
-
-    /// @notice Native MON held for sponsorship claims.
     uint256 public treasuryBalance;
-
-    /// @notice Tracks whether an address has already claimed.
     mapping(address => bool) public hasClaimed;
-
-    /// @notice Aggregate MON deposited by sponsors.
     uint256 public totalSponsored;
-
-    /// @notice Aggregate MON claimed by users.
     uint256 public totalClaimed;
-
-    /// @notice Number of unique wallets that successfully claimed.
     uint256 public usersHelped;
-
-    /// @notice Number of distinct deposit transactions.
     uint256 public depositCount;
 
+    /// @notice Authorized relayer that may claim on behalf of zero-balance wallets.
+    address public relayer;
+
     constructor(address initialOwner, uint256 initialMaxClaim) Ownable(initialOwner) {
-        if (initialOwner == address(0)) revert GSLErrors.ZeroAddress();
-        if (initialMaxClaim == 0) revert GSLErrors.InvalidMaxClaim();
+        if (initialOwner == address(0)) revert ZeroAddress();
+        if (initialMaxClaim == 0) revert InvalidMaxClaim();
         maxClaimAmount = initialMaxClaim;
+        relayer = initialOwner;
+        emit RelayerUpdated(address(0), initialOwner);
     }
 
-    /// @notice Sponsor deposits native MON into the treasury.
     function deposit() external payable whenNotPaused nonReentrant {
-        if (msg.value == 0) revert GSLErrors.ZeroAmount();
+        if (msg.value == 0) revert ZeroAmount();
 
         treasuryBalance += msg.value;
         totalSponsored += msg.value;
@@ -53,32 +52,48 @@ contract GasSponsorLedger is Ownable, Pausable, ReentrancyGuard, IGSLEvents {
         emit SponsorDeposited(msg.sender, msg.value, treasuryBalance);
     }
 
-    /// @notice Claim sponsored gas once per wallet.
     function claim() external whenNotPaused nonReentrant {
-        if (hasClaimed[msg.sender]) revert GSLErrors.AlreadyClaimed();
-        if (treasuryBalance < maxClaimAmount) revert GSLErrors.InsufficientTreasury();
+        _claim(msg.sender);
+    }
+
+    /// @notice Gasless onboarding: the relayer pays gas, the recipient gets MON.
+    /// @dev One-claim-per-wallet is enforced on the recipient, not the relayer,
+    ///      so a zero-balance wallet can be onboarded without ever holding MON.
+    function claimFor(address recipient) external whenNotPaused nonReentrant {
+        if (msg.sender != relayer && msg.sender != owner()) revert NotRelayer();
+        if (recipient == address(0)) revert ZeroAddress();
+        _claim(recipient);
+    }
+
+    function setRelayer(address newRelayer) external onlyOwner {
+        if (newRelayer == address(0)) revert ZeroAddress();
+        address old = relayer;
+        relayer = newRelayer;
+        emit RelayerUpdated(old, newRelayer);
+    }
+
+    function _claim(address recipient) private {
+        if (hasClaimed[recipient]) revert AlreadyClaimed();
+        if (treasuryBalance < maxClaimAmount) revert InsufficientTreasury();
 
         uint256 amount = maxClaimAmount;
 
-        // Effects
-        hasClaimed[msg.sender] = true;
+        hasClaimed[recipient] = true;
         treasuryBalance -= amount;
         totalClaimed += amount;
         unchecked {
             ++usersHelped;
         }
 
-        // Interactions
-        _safeSend(msg.sender, amount);
+        _safeSend(recipient, amount);
 
-        emit GasClaimed(msg.sender, amount, treasuryBalance);
+        emit GasClaimed(recipient, amount, treasuryBalance);
     }
 
-    /// @notice Owner withdraws MON from the treasury (operational).
     function withdrawTreasury(address to, uint256 amount) external onlyOwner nonReentrant {
-        if (to == address(0)) revert GSLErrors.ZeroAddress();
-        if (amount == 0) revert GSLErrors.ZeroAmount();
-        if (amount > treasuryBalance) revert GSLErrors.InsufficientTreasury();
+        if (to == address(0)) revert ZeroAddress();
+        if (amount == 0) revert ZeroAmount();
+        if (amount > treasuryBalance) revert InsufficientTreasury();
 
         treasuryBalance -= amount;
         _safeSend(to, amount);
@@ -86,12 +101,11 @@ contract GasSponsorLedger is Ownable, Pausable, ReentrancyGuard, IGSLEvents {
         emit TreasuryWithdrawn(to, amount, treasuryBalance);
     }
 
-    /// @notice Owner drains full contract balance while paused (emergency).
     function emergencyWithdraw(address to) external onlyOwner whenPaused nonReentrant {
-        if (to == address(0)) revert GSLErrors.ZeroAddress();
+        if (to == address(0)) revert ZeroAddress();
 
         uint256 amount = address(this).balance;
-        if (amount == 0) revert GSLErrors.ZeroAmount();
+        if (amount == 0) revert ZeroAmount();
 
         treasuryBalance = 0;
         _safeSend(to, amount);
@@ -99,9 +113,8 @@ contract GasSponsorLedger is Ownable, Pausable, ReentrancyGuard, IGSLEvents {
         emit EmergencyWithdraw(to, amount);
     }
 
-    /// @notice Update the per-wallet claim cap.
     function setMaxClaimAmount(uint256 newMax) external onlyOwner {
-        if (newMax == 0) revert GSLErrors.InvalidMaxClaim();
+        if (newMax == 0) revert InvalidMaxClaim();
         uint256 old = maxClaimAmount;
         maxClaimAmount = newMax;
         emit MaxClaimUpdated(old, newMax);
@@ -115,12 +128,10 @@ contract GasSponsorLedger is Ownable, Pausable, ReentrancyGuard, IGSLEvents {
         _unpause();
     }
 
-    /// @notice Eligibility helper for frontends.
     function canClaim(address account) external view returns (bool) {
         return !hasClaimed[account] && treasuryBalance >= maxClaimAmount && !paused();
     }
 
-    /// @notice Snapshot of ledger metrics for dashboards.
     function getStats()
         external
         view
@@ -147,11 +158,11 @@ contract GasSponsorLedger is Ownable, Pausable, ReentrancyGuard, IGSLEvents {
 
     function _safeSend(address to, uint256 amount) private {
         (bool ok,) = to.call{value: amount}("");
-        if (!ok) revert GSLErrors.TransferFailed();
+        if (!ok) revert TransferFailed();
     }
 
     receive() external payable {
-        if (msg.value == 0) revert GSLErrors.ZeroAmount();
+        if (msg.value == 0) revert ZeroAmount();
         treasuryBalance += msg.value;
         totalSponsored += msg.value;
         unchecked {

@@ -1,4 +1,4 @@
-# Smart Contract — GasSponsorLedger (Hardhat)
+# Smart Contract — SparkGas (`GasSponsorLedger`)
 
 ## Stack
 

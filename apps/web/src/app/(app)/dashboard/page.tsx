@@ -21,7 +21,7 @@ export default function DashboardPage() {
           </div>
           <h1 className="mt-2 font-display text-3xl font-semibold">Treasury overview</h1>
           <p className="mt-2 text-muted">
-            Live sponsorship metrics {demo ? '(demo ledger)' : 'from GasSponsorLedger'}.
+            Live sponsorship metrics {demo ? '(demo ledger)' : 'from SparkGas'}.
           </p>
           {ledgerAddress ? (
             <a

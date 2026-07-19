@@ -21,7 +21,7 @@ export default function ClaimPage() {
   const { stats, demo } = useTreasury()
   const { canClaim, isLoading: checking } = useCanClaim(address)
   const { hasClaimed } = useHasClaimed(address)
-  const { claim, isPending, hash } = useClaim()
+  const { claim, isPending, hash, gasless } = useClaim()
   const history = useLedgerHistory()
 
   let statusTone: 'ok' | 'warn' | 'danger' | 'neutral' = 'neutral'
@@ -50,17 +50,26 @@ export default function ClaimPage() {
         <p className="mt-2 text-muted">
           One claim per wallet · up to{' '}
           <span className="font-mono text-gold">
-            {stats ? formatMon(stats.maxClaimAmount) : '0.01'} MON
+            {stats ? formatMon(stats.maxClaimAmount) : '0.1'} MON
           </span>
+          {gasless ? (
+            <>
+              {' '}
+              · <span className="text-emerald">gasless — you pay $0</span>
+            </>
+          ) : null}
         </p>
-        <div className="mt-3">
+        <div className="mt-3 flex flex-wrap gap-2">
           <Badge tone={demo ? 'warn' : 'ok'}>{demo ? 'Demo mode' : 'On-chain'}</Badge>
+          {gasless ? <Badge tone="ok">Gasless relayer</Badge> : null}
         </div>
       </div>
 
       {!isConnected ? (
         <Card className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-muted">Connect to check eligibility and claim.</p>
+          <p className="text-sm text-muted">
+            Connect any wallet — even with zero MON. Signing is free; the relayer pays gas.
+          </p>
           <ConnectButton />
         </Card>
       ) : null}
@@ -81,11 +90,17 @@ export default function ClaimPage() {
         </div>
 
         <ol className="space-y-3 border-l border-hair pl-5 text-sm text-muted">
-          <li>Wallet connected to Monad</li>
-          <li>Never claimed before</li>
-          <li>Treasury ≥ max claim</li>
-          <li>Contract not paused</li>
+          <li>Connect a wallet (zero MON is fine)</li>
+          <li>Sign a free message — no gas required</li>
+          <li>Relayer submits `claimFor(you)` and pays the fee</li>
+          <li>You receive MON and can start using Monad</li>
         </ol>
+
+        <div className="rounded-xl border border-hair bg-glass px-4 py-3 text-sm text-muted">
+          Students and first-time users never need starter MON. The wallet only asks for a
+          signature. The sponsor treasury funds the claim, and the relayer covers the
+          transaction fee.
+        </div>
 
         <motion.div whileTap={{ scale: 0.98 }}>
           <Button
@@ -93,13 +108,19 @@ export default function ClaimPage() {
             disabled={!isConnected || !canClaim || isPending || hasClaimed}
             onClick={() => void claim()}
           >
-            {isPending ? 'Claiming…' : hasClaimed ? 'Already claimed' : 'Claim gas'}
+            {isPending
+              ? 'Claiming…'
+              : hasClaimed
+                ? 'Already claimed'
+                : gasless
+                  ? 'Claim gas (free — sign only)'
+                  : 'Claim gas'}
           </Button>
         </motion.div>
 
         {hash ? (
           <p className="font-mono text-xs text-muted">
-            Pending tx:{' '}
+            Relayer tx:{' '}
             <a
               href={`${env.explorerUrl}/tx/${hash}`}
               target="_blank"

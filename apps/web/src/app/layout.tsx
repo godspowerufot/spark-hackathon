@@ -3,8 +3,8 @@ import { AppProviders } from '@/providers/AppProviders'
 import '@/styles/globals.css'
 
 export const metadata: Metadata = {
-  title: 'Gas Sponsor Ledger',
-  description: 'Decentralized MON gas sponsorship on Monad',
+  title: 'SparkGas',
+  description: 'Sponsored MON gas for zero-balance wallets on Monad',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

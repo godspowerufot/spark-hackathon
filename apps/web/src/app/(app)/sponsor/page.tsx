@@ -36,7 +36,7 @@ export default function SponsorPage() {
               rel="noreferrer"
               className="font-mono text-xs text-gold hover:underline"
             >
-              Ledger {ledgerAddress.slice(0, 8)}…
+              SparkGas vault {ledgerAddress.slice(0, 8)}…
             </a>
           ) : null}
         </div>

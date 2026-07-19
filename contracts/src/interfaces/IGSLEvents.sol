@@ -8,4 +8,5 @@ interface IGSLEvents {
     event TreasuryWithdrawn(address indexed to, uint256 amount, uint256 treasuryBalance);
     event EmergencyWithdraw(address indexed to, uint256 amount);
     event MaxClaimUpdated(uint256 oldAmount, uint256 newAmount);
+    event RelayerUpdated(address indexed oldRelayer, address indexed newRelayer);
 }

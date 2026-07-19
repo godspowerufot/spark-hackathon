@@ -11,7 +11,8 @@ import {
     AlreadyClaimed,
     InsufficientTreasury,
     InvalidMaxClaim,
-    TransferFailed
+    TransferFailed,
+    NotRelayer
 } from "./errors/GSLErrors.sol";
 import {IGSLEvents} from "./interfaces/IGSLEvents.sol";
 
@@ -28,10 +29,15 @@ contract GasSponsorLedger is Ownable, Pausable, ReentrancyGuard, IGSLEvents {
     uint256 public usersHelped;
     uint256 public depositCount;
 
+    /// @notice Authorized relayer that may claim on behalf of zero-balance wallets.
+    address public relayer;
+
     constructor(address initialOwner, uint256 initialMaxClaim) Ownable(initialOwner) {
         if (initialOwner == address(0)) revert ZeroAddress();
         if (initialMaxClaim == 0) revert InvalidMaxClaim();
         maxClaimAmount = initialMaxClaim;
+        relayer = initialOwner;
+        emit RelayerUpdated(address(0), initialOwner);
     }
 
     function deposit() external payable whenNotPaused nonReentrant {
@@ -47,21 +53,41 @@ contract GasSponsorLedger is Ownable, Pausable, ReentrancyGuard, IGSLEvents {
     }
 
     function claim() external whenNotPaused nonReentrant {
-        if (hasClaimed[msg.sender]) revert AlreadyClaimed();
+        _claim(msg.sender);
+    }
+
+    /// @notice Gasless onboarding: the relayer pays gas, the recipient gets MON.
+    /// @dev One-claim-per-wallet is enforced on the recipient, not the relayer,
+    ///      so a zero-balance wallet can be onboarded without ever holding MON.
+    function claimFor(address recipient) external whenNotPaused nonReentrant {
+        if (msg.sender != relayer && msg.sender != owner()) revert NotRelayer();
+        if (recipient == address(0)) revert ZeroAddress();
+        _claim(recipient);
+    }
+
+    function setRelayer(address newRelayer) external onlyOwner {
+        if (newRelayer == address(0)) revert ZeroAddress();
+        address old = relayer;
+        relayer = newRelayer;
+        emit RelayerUpdated(old, newRelayer);
+    }
+
+    function _claim(address recipient) private {
+        if (hasClaimed[recipient]) revert AlreadyClaimed();
         if (treasuryBalance < maxClaimAmount) revert InsufficientTreasury();
 
         uint256 amount = maxClaimAmount;
 
-        hasClaimed[msg.sender] = true;
+        hasClaimed[recipient] = true;
         treasuryBalance -= amount;
         totalClaimed += amount;
         unchecked {
             ++usersHelped;
         }
 
-        _safeSend(msg.sender, amount);
+        _safeSend(recipient, amount);
 
-        emit GasClaimed(msg.sender, amount, treasuryBalance);
+        emit GasClaimed(recipient, amount, treasuryBalance);
     }
 
     function withdrawTreasury(address to, uint256 amount) external onlyOwner nonReentrant {

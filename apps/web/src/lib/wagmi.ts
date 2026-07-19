@@ -41,7 +41,7 @@ const connectors = connectorsForWallets(
     },
   ],
   {
-    appName: 'Gas Sponsor Ledger',
+    appName: 'SparkGas',
     projectId: env.walletConnectProjectId,
   },
 )

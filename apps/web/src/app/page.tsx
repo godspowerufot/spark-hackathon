@@ -1,6 +1,7 @@
 import Link from 'next/link'
-import { FAQ } from '@/constants/app'
 import { SiteHeader } from '@/components/shared/SiteHeader'
+import { FaqAccordion } from '@/components/shared/FaqAccordion'
+import { TypewriterHeadline } from '@/components/shared/TypewriterHeadline'
 import { Button } from '@/components/ui/Button'
 
 export default function LandingPage() {
@@ -14,26 +15,35 @@ export default function LandingPage() {
       />
       <SiteHeader marketing />
 
-      <section className="relative flex min-h-screen items-center justify-center px-6 pt-24 text-center">
+      <section className="relative flex min-h-screen items-center justify-center overflow-hidden px-6 pt-24 text-center">
+        <video
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="metadata"
+          aria-hidden="true"
+          className="absolute inset-0 -z-20 h-full w-full object-cover"
+        >
+          <source src="/6624829-uhd_2160_3840_30fps.mp4" type="video/mp4" />
+        </video>
+        {/* Heavy dark scrim + brand glow so the headline pops over the video */}
         <div
-          className="absolute inset-0 -z-10"
+          className="absolute inset-0 -z-10 bg-black/60"
           style={{
             background:
-              'radial-gradient(ellipse at 50% 30%, rgba(212,175,55,0.08), transparent 55%), radial-gradient(ellipse at 50% 80%, rgba(0,208,132,0.05), transparent 50%)',
+              'linear-gradient(180deg, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.78) 45%, rgba(0,0,0,0.94) 100%), radial-gradient(ellipse at 50% 30%, rgba(212,175,55,0.1), transparent 55%), radial-gradient(ellipse at 50% 80%, rgba(0,208,132,0.05), transparent 50%)',
           }}
         />
-        <div className="max-w-3xl">
+        <div className="max-w-4xl">
           <div className="mb-6 font-mono text-[0.68rem] uppercase tracking-[0.35em] text-gold">
-            Gas Sponsorship Protocol · Monad
+            SparkGas · Monad
           </div>
-          <h1 className="font-display text-[clamp(2.4rem,5.5vw,4.8rem)] font-semibold leading-[1.05] tracking-[-0.02em] text-gradient">
-            Sponsor the first mile.
-            <br />
-            Unlock every wallet.
-          </h1>
-          <p className="mx-auto mt-7 max-w-xl text-[1.05rem] font-light leading-relaxed text-muted">
-            Organizations deposit MON. New users claim gas once. Transparent, auditable, and
-            on-chain — so onboarding never fails for lack of native tokens.
+          <TypewriterHeadline />
+          <p className="mx-auto mt-8 max-w-xl text-[1.1rem] font-light leading-relaxed text-ink/90">
+            New wallets on Monad can&apos;t transact with{' '}
+            <span className="font-mono text-gold">0 MON</span>. Sponsors fund the vault — you claim
+            free gas once by signing, no balance required.
           </p>
           <div className="mt-10 flex flex-wrap justify-center gap-4">
             <Link href="/claim">
@@ -82,19 +92,12 @@ export default function LandingPage() {
       </section>
 
       <section className="border-y border-hair px-6 py-28" id="faq">
-        <div className="mx-auto max-w-3xl">
+        <div className="mx-auto max-w-4xl">
           <div className="text-center">
             <div className="font-mono text-[0.66rem] uppercase tracking-[0.3em] text-gold">FAQ</div>
             <h2 className="mt-3 font-display text-3xl font-semibold">Clear answers</h2>
           </div>
-          <div className="mt-12 space-y-4">
-            {FAQ.map((item) => (
-              <div key={item.q} className="panel p-6">
-                <h3 className="font-display text-lg">{item.q}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-muted">{item.a}</p>
-              </div>
-            ))}
-          </div>
+          <FaqAccordion />
         </div>
       </section>
 
@@ -108,10 +111,27 @@ export default function LandingPage() {
         </Link>
       </section>
 
-      <footer className="border-t border-hair px-6 py-10">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4">
+      <footer className="border-t border-hair pb-10 pt-6">
+        <div className="overflow-hidden whitespace-nowrap py-6" aria-hidden="true">
+          <div className="animate-marquee inline-flex will-change-transform">
+            {[0, 1].map((copy) => (
+              <span
+                key={copy}
+                className="font-display text-[clamp(4rem,10vw,9rem)] font-bold leading-none tracking-[-0.02em]"
+              >
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <span key={i} className="mr-16 inline-flex items-baseline">
+                    <span className="glow-spark">Spark</span>
+                    <span className="text-white/15">Gas</span>
+                  </span>
+                ))}
+              </span>
+            ))}
+          </div>
+        </div>
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6">
           <div className="font-display font-semibold">
-            Gas Sponsor Ledger
+            SparkGas
             <span className="mt-1 block font-mono text-[0.62rem] uppercase tracking-[0.2em] text-muted-2">
               Built on Monad
             </span>

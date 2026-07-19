@@ -66,6 +66,36 @@
     background-clip: text;
     color: transparent;
   }
+  .animate-marquee {
+    animation: marquee 22s linear infinite;
+  }
+  .glow-spark {
+    color: var(--color-gold);
+    animation: glow-spark 2.4s ease-in-out infinite;
+  }
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes glow-spark {
+  0%,
+  100% {
+    text-shadow:
+      0 0 18px rgb(212 175 55 / 0.55),
+      0 0 46px rgb(212 175 55 / 0.3);
+  }
+  50% {
+    text-shadow:
+      0 0 34px rgb(212 175 55 / 0.95),
+      0 0 90px rgb(212 175 55 / 0.55);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
