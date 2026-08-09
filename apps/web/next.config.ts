@@ -21,6 +21,7 @@ const nextConfig: NextConfig = {
     return config
   },
   turbopack: {
+    root: __dirname,
     resolveAlias: {
       '@x402/core': './src/lib/empty-module.ts',
       '@x402/core/client': './src/lib/empty-module.ts',
