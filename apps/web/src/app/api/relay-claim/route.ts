@@ -11,25 +11,12 @@ import {
 } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { gasSponsorLedgerAbi } from '@/contracts/abi'
-import { monadTestnet } from '@/config/env'
+import { getChainConfig, isSupportedAppChain } from '@/config/chains'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-const LEDGER = (process.env.NEXT_PUBLIC_LEDGER_ADDRESS || '') as Address | ''
 const RELAYER_KEY = (process.env.RELAYER_PRIVATE_KEY || process.env.PRIVATE_KEY || '') as Hex | ''
-
-function rpcUrls(): string[] {
-  return [
-    ...new Set(
-      [
-        process.env.NEXT_PUBLIC_RPC_URL,
-        'https://monad-testnet.drpc.org',
-        'https://testnet-rpc.monad.xyz',
-      ].filter((u): u is string => Boolean(u)),
-    ),
-  ]
-}
 
 function claimMessage(recipient: Address, contract: Address, chainId: number) {
   return [
@@ -42,9 +29,6 @@ function claimMessage(recipient: Address, contract: Address, chainId: number) {
 
 export async function POST(request: Request) {
   try {
-    if (!LEDGER) {
-      return NextResponse.json({ error: 'Ledger not configured' }, { status: 503 })
-    }
     if (!RELAYER_KEY) {
       return NextResponse.json(
         { error: 'Relayer key not configured on server' },
@@ -55,6 +39,18 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       recipient?: string
       signature?: string
+      chainId?: number
+    }
+
+    const chainId = Number(body.chainId)
+    if (!isSupportedAppChain(chainId)) {
+      return NextResponse.json({ error: 'Unsupported chainId' }, { status: 400 })
+    }
+
+    const cfg = getChainConfig(chainId)
+    const ledger = cfg.ledgerAddress
+    if (!ledger) {
+      return NextResponse.json({ error: `Ledger not configured for ${cfg.label}` }, { status: 503 })
     }
 
     const recipient = body.recipient as Address | undefined
@@ -67,7 +63,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing signature' }, { status: 400 })
     }
 
-    const message = claimMessage(recipient, LEDGER, monadTestnet.id)
+    const message = claimMessage(recipient, ledger, chainId)
     const valid = await verifyMessage({
       address: recipient,
       message,
@@ -81,19 +77,19 @@ export async function POST(request: Request) {
     }
 
     const publicClient = createPublicClient({
-      chain: monadTestnet,
-      transport: fallback(rpcUrls().map((url) => http(url))),
+      chain: cfg.chain,
+      transport: fallback(cfg.rpcUrls.map((url) => http(url))),
     })
 
     const eligible = await publicClient.readContract({
-      address: LEDGER,
+      address: ledger,
       abi: gasSponsorLedgerAbi,
       functionName: 'canClaim',
       args: [recipient],
     })
     if (!eligible) {
       const claimed = await publicClient.readContract({
-        address: LEDGER,
+        address: ledger,
         abi: gasSponsorLedgerAbi,
         functionName: 'hasClaimed',
         args: [recipient],
@@ -113,17 +109,17 @@ export async function POST(request: Request) {
     )
     const walletClient = createWalletClient({
       account,
-      chain: monadTestnet,
-      transport: fallback(rpcUrls().map((url) => http(url))),
+      chain: cfg.chain,
+      transport: fallback(cfg.rpcUrls.map((url) => http(url))),
     })
 
     const hash = await walletClient.writeContract({
-      address: LEDGER,
+      address: ledger,
       abi: gasSponsorLedgerAbi,
       functionName: 'claimFor',
       args: [recipient],
       account,
-      chain: monadTestnet,
+      chain: cfg.chain,
     })
 
     const receipt = await publicClient.waitForTransactionReceipt({
@@ -139,9 +135,10 @@ export async function POST(request: Request) {
     return NextResponse.json({
       hash,
       recipient,
+      chainId,
       amountWei: (
         await publicClient.readContract({
-          address: LEDGER,
+          address: ledger,
           abi: gasSponsorLedgerAbi,
           functionName: 'maxClaimAmount',
         })
@@ -153,12 +150,17 @@ export async function POST(request: Request) {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const url = new URL(request.url)
+  const chainId = Number(url.searchParams.get('chainId') || 0)
+  const cfg = isSupportedAppChain(chainId) ? getChainConfig(chainId) : null
   return NextResponse.json({
-    enabled: Boolean(LEDGER && RELAYER_KEY),
-    ledger: LEDGER || null,
-    claimMessageTemplate: LEDGER
-      ? claimMessage('0xRecipient' as Address, LEDGER, monadTestnet.id)
-      : null,
+    enabled: Boolean(cfg?.ledgerAddress && RELAYER_KEY),
+    ledger: cfg?.ledgerAddress || null,
+    chainId: cfg?.id ?? null,
+    claimMessageTemplate:
+      cfg?.ledgerAddress
+        ? claimMessage('0xRecipient' as Address, cfg.ledgerAddress, cfg.id)
+        : null,
   })
 }

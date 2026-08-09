@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from 'react'
 
-const BEFORE = 'Claim gas '
-const HIGHLIGHT = 'without paying'
+const BEFORE = 'Claim gas. '
+const HIGHLIGHT = 'Walk in VIP'
 const AFTER = '.'
 const FULL = BEFORE + HIGHLIGHT + AFTER
 
-const TYPE_MS = 60
+const TYPE_MS = 55
 
 export function TypewriterHeadline() {
   const [text, setText] = useState('')
@@ -24,8 +24,8 @@ export function TypewriterHeadline() {
   const typedAfter = text.slice(BEFORE.length + HIGHLIGHT.length)
 
   return (
-    <h1 className="font-display text-[clamp(3rem,7.5vw,6.5rem)] font-bold leading-[1.06] tracking-[-0.02em] text-white">
-      <span className="block min-h-[2.2em] sm:min-h-[1.15em]">
+    <h1 className="font-display text-[clamp(2.4rem,6.5vw,4.75rem)] font-bold leading-[1.08] tracking-[-0.02em] text-white">
+      <span className="block min-h-[2.4em] sm:min-h-[1.2em]">
         {typedBefore}
         <span className="bg-linear-to-br from-[#F3D888] via-gold to-[#B8912B] bg-clip-text font-extrabold text-transparent">
           {typedHighlight}

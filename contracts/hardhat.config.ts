@@ -12,6 +12,10 @@ const MONAD_TESTNET_RPC =
   'https://testnet-rpc.monad.xyz'
 const MONAD_MAINNET_RPC =
   process.env.MONAD_MAINNET_RPC_URL || 'https://rpc.monad.xyz'
+const ARC_TESTNET_RPC =
+  process.env.ARC_TESTNET_RPC_URL ||
+  process.env.NEXT_PUBLIC_RPC_URL_ARC ||
+  'https://rpc.testnet.arc.network'
 
 const config: HardhatUserConfig = {
   solidity: {
@@ -42,6 +46,11 @@ const config: HardhatUserConfig = {
     monadMainnet: {
       url: MONAD_MAINNET_RPC,
       chainId: 143,
+      accounts: PRIVATE_KEY ? [PRIVATE_KEY] : [],
+    },
+    arcTestnet: {
+      url: ARC_TESTNET_RPC,
+      chainId: 5042002,
       accounts: PRIVATE_KEY ? [PRIVATE_KEY] : [],
     },
   },

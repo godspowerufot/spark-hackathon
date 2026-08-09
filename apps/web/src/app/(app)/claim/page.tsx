@@ -1,10 +1,15 @@
 'use client'
 
+import { Suspense, useEffect } from 'react'
+import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { motion } from 'framer-motion'
 import { Badge, Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { TxHistoryList } from '@/components/shared/TxHistory'
+import { ChainSwitcher } from '@/components/shared/ChainSwitcher'
+import { FlowStepper, ONBOARDING_FLOW } from '@/components/shared/FlowStepper'
 import {
   useCanClaim,
   useClaim,
@@ -13,21 +18,28 @@ import {
   useTreasury,
   useWallet,
 } from '@/hooks/useLedger'
-import { env } from '@/config/env'
+import { arcTestnet } from '@/config/chains'
 import { formatMon, shortAddress } from '@/lib/utils'
 
-export default function ClaimPage() {
-  const { address, isConnected } = useWallet()
-  const { stats, demo } = useTreasury()
+function ClaimInner() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const eventId = searchParams.get('event') || 'arc-summit-vip'
+  const { address, isConnected, chainId } = useWallet()
+  const { stats, demo, gasSymbol, explorerUrl, chainLabel, supported } = useTreasury()
   const { canClaim, isLoading: checking } = useCanClaim(address)
   const { hasClaimed } = useHasClaimed(address)
   const { claim, isPending, hash, gasless } = useClaim()
   const history = useLedgerHistory()
+  const onArc = chainId === arcTestnet.id
 
   let statusTone: 'ok' | 'warn' | 'danger' | 'neutral' = 'neutral'
   let statusLabel = 'Connect wallet'
   if (isConnected) {
-    if (hasClaimed) {
+    if (!supported) {
+      statusTone = 'danger'
+      statusLabel = 'Switch to Monad or Arc'
+    } else if (hasClaimed) {
       statusTone = 'warn'
       statusLabel = 'Already claimed'
     } else if (stats?.paused) {
@@ -42,33 +54,46 @@ export default function ClaimPage() {
     }
   }
 
+  useEffect(() => {
+    if (!hash || !onArc) return
+    const t = window.setTimeout(() => {
+      router.push(`/events/${eventId}/vip?fromClaim=1&tx=${hash}`)
+    }, 1400)
+    return () => window.clearTimeout(t)
+  }, [eventId, hash, onArc, router])
+
   return (
     <div className="mx-auto max-w-2xl space-y-8">
-      <div>
-        <div className="font-mono text-[0.66rem] uppercase tracking-[0.3em] text-gold">Claim</div>
-        <h1 className="mt-2 font-display text-3xl font-semibold">Claim sponsored gas</h1>
-        <p className="mt-2 text-muted">
-          One claim per wallet · up to{' '}
-          <span className="font-mono text-gold">
-            {stats ? formatMon(stats.maxClaimAmount) : '0.1'} MON
-          </span>
-          {gasless ? (
-            <>
-              {' '}
-              · <span className="text-emerald">gasless — you pay $0</span>
-            </>
-          ) : null}
-        </p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Badge tone={demo ? 'warn' : 'ok'}>{demo ? 'Demo mode' : 'On-chain'}</Badge>
-          {gasless ? <Badge tone="ok">Gasless relayer</Badge> : null}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <div className="font-mono text-[0.66rem] uppercase tracking-[0.3em] text-gold">Claim</div>
+          <h1 className="mt-2 font-display text-3xl font-semibold">Claim sponsored gas</h1>
+          <p className="mt-2 text-muted">
+            Step 1 for event VIP · up to{' '}
+            <span className="font-mono text-gold">
+              {stats ? formatMon(stats.maxClaimAmount) : '0.1'} {gasSymbol}
+            </span>
+            {gasless ? (
+              <>
+                {' '}
+                · <span className="text-emerald">gasless</span>
+              </>
+            ) : null}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Badge tone={demo ? 'warn' : 'ok'}>{demo ? 'Demo mode' : chainLabel}</Badge>
+            <Badge tone="gold">Event: {eventId}</Badge>
+          </div>
         </div>
+        <ChainSwitcher />
       </div>
+
+      {onArc ? <FlowStepper steps={ONBOARDING_FLOW} current={hash ? 1 : 0} /> : null}
 
       {!isConnected ? (
         <Card className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted">
-            Connect any wallet — even with zero MON. Signing is free; the relayer pays gas.
+            Connect any wallet — even with zero {gasSymbol}.
           </p>
           <ConnectButton />
         </Card>
@@ -76,60 +101,54 @@ export default function ClaimPage() {
 
       <Card className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="font-mono text-[0.62rem] uppercase tracking-[0.2em] text-muted-2">
-              Eligibility
-            </div>
-            <div className="mt-2">
-              <Badge tone={statusTone}>{checking ? 'Checking…' : statusLabel}</Badge>
-            </div>
-          </div>
+          <Badge tone={statusTone}>{checking ? 'Checking…' : statusLabel}</Badge>
           {address ? (
             <span className="font-mono text-sm text-muted">{shortAddress(address)}</span>
           ) : null}
         </div>
 
         <ol className="space-y-3 border-l border-hair pl-5 text-sm text-muted">
-          <li>Connect a wallet (zero MON is fine)</li>
-          <li>Sign a free message — no gas required</li>
-          <li>Relayer submits `claimFor(you)` and pays the fee</li>
-          <li>You receive MON and can start using Monad</li>
+          <li>Switch to Arc</li>
+          <li>Sign once — relayer pays gas</li>
+          <li>Continue to VIP ticket for your event</li>
         </ol>
-
-        <div className="rounded-xl border border-hair bg-glass px-4 py-3 text-sm text-muted">
-          Students and first-time users never need starter MON. The wallet only asks for a
-          signature. The sponsor treasury funds the claim, and the relayer covers the
-          transaction fee.
-        </div>
 
         <motion.div whileTap={{ scale: 0.98 }}>
           <Button
             className="w-full"
-            disabled={!isConnected || !canClaim || isPending || hasClaimed}
+            disabled={!isConnected || !supported || !canClaim || isPending || hasClaimed}
             onClick={() => void claim()}
           >
             {isPending
               ? 'Claiming…'
               : hasClaimed
                 ? 'Already claimed'
-                : gasless
-                  ? 'Claim gas (free — sign only)'
-                  : 'Claim gas'}
+                : 'Claim gas (free — sign only)'}
           </Button>
         </motion.div>
 
+        {hasClaimed && onArc && !hash ? (
+          <Link href={`/events/${eventId}/vip`}>
+            <Button variant="secondary" className="w-full">
+              Continue to VIP
+            </Button>
+          </Link>
+        ) : null}
+
         {hash ? (
-          <p className="font-mono text-xs text-muted">
-            Relayer tx:{' '}
-            <a
-              href={`${env.explorerUrl}/tx/${hash}`}
-              target="_blank"
-              rel="noreferrer"
-              className="text-gold hover:underline"
-            >
-              {hash.slice(0, 10)}…
-            </a>
-          </p>
+          <div className="rounded-xl border border-emerald/25 bg-emerald/10 px-4 py-3 text-sm text-emerald">
+            Claim confirmed — opening VIP checkout…
+            <div className="mt-2 font-mono text-xs">
+              <a
+                href={`${explorerUrl}/tx/${hash}`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-gold hover:underline"
+              >
+                {hash.slice(0, 12)}…
+              </a>
+            </div>
+          </div>
         ) : null}
       </Card>
 
@@ -141,5 +160,17 @@ export default function ClaimPage() {
         kind="claim"
       />
     </div>
+  )
+}
+
+export default function ClaimPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="mx-auto max-w-2xl py-16 text-center text-sm text-muted">Loading…</div>
+      }
+    >
+      <ClaimInner />
+    </Suspense>
   )
 }

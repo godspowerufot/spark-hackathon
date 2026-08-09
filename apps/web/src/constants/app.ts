@@ -1,23 +1,27 @@
 export const APP_NAME = 'SparkGas'
-export const APP_TAGLINE = 'Sponsored MON gas for seamless Monad onboarding'
+export const APP_TAGLINE = 'Claim gas → VIP pass on Arc'
 
-export const DEFAULT_MAX_CLAIM_LABEL = '0.1 MON'
+export const DEFAULT_MAX_CLAIM_LABEL = '0.1 gas'
 
 export const FAQ = [
   {
-    q: 'What is SparkGas?',
-    a: 'A transparent on-chain vault where sponsors deposit MON so new users can claim gas for their first Monad transactions — even with a zero-MON wallet.',
+    q: 'What is Event Mode?',
+    a: 'Merchants list events, sponsors fund the USDC vault on Arc, guests claim gas once, buy VIP with that same USDC, and show a QR-backed pass at the door.',
   },
   {
-    q: 'Who can claim?',
-    a: 'Any wallet that has not claimed before, while the treasury holds at least the max claim amount and the contract is not paused.',
+    q: 'Why Arc?',
+    a: 'On Arc, gas is native USDC — so sponsored gas is spendable money. That is how claim → VIP payment works without a separate token dance.',
   },
   {
-    q: 'Is this custodial?',
-    a: 'No. Funds live in the GasSponsorLedger smart contract. Claims and deposits emit on-chain events for full auditability.',
+    q: 'Is the VIP pass an NFT?',
+    a: 'It looks and shares like one (avatar + foil card + QR), but proof is your Arc payment transaction — no extra mint required.',
+  },
+  {
+    q: 'Who gets the VIP payment?',
+    a: 'Checkout goes through the FirstPayment contract on Arc, which forwards USDC to the merchant wallet. The event memo ties the tx to that listing.',
   },
   {
     q: 'Can I claim twice?',
-    a: 'No. Each wallet may claim once. Double-claim attempts revert with AlreadyClaimed.',
+    a: 'No. Each wallet may claim once per chain.',
   },
 ] as const

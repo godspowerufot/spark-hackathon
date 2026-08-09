@@ -21,6 +21,11 @@ export function formatMon(wei: bigint, digits = 4) {
   return n.toLocaleString(undefined, { maximumFractionDigits: digits })
 }
 
+/** Format native gas amount (18 decimals) for MON or Arc USDC native view. */
+export function formatGas(wei: bigint, symbol = 'MON', digits = 4) {
+  return `${formatMon(wei, digits)} ${symbol}`
+}
+
 export function explorerTx(base: string, hash: Hex | string) {
   return `${base.replace(/\/$/, '')}/tx/${hash}`
 }
@@ -36,13 +41,13 @@ export function humanError(err: unknown): string {
     return 'This wallet has already claimed sponsored gas.'
   }
   if (lower.includes('insufficienttreasury') || lower.includes('insufficient treasury')) {
-    return 'Treasury does not have enough MON for this claim.'
+    return 'Treasury does not have enough gas for this claim.'
   }
   if (lower.includes('user rejected') || lower.includes('denied')) {
     return 'Transaction rejected in wallet.'
   }
   if (lower.includes('wrong network') || lower.includes('chain mismatch')) {
-    return 'Wrong network. Switch to Monad.'
+    return 'Wrong network. Switch to Monad Testnet or Arc Testnet.'
   }
   if (lower.includes('zeroamount')) return 'Amount must be greater than zero.'
   if (lower.includes('enforcedpause') || lower.includes('paused')) {

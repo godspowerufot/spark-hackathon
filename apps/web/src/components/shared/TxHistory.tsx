@@ -1,8 +1,8 @@
 'use client'
 
 import { Card, Skeleton } from '@/components/ui/Card'
-import { env } from '@/config/env'
 import type { LedgerHistoryItem } from '@/hooks/useLedger'
+import { useActiveLedger } from '@/hooks/useLedger'
 import { explorerTx, formatMon, shortAddress, shortHash } from '@/lib/utils'
 
 export function TxHistoryList({
@@ -18,6 +18,7 @@ export function TxHistoryList({
   isLoading?: boolean
   kind?: 'deposit' | 'claim' | 'all'
 }) {
+  const { explorerUrl, gasSymbol } = useActiveLedger()
   const filtered =
     kind && kind !== 'all' ? items.filter((item) => item.kind === kind) : items
 
@@ -37,9 +38,7 @@ export function TxHistoryList({
             filtered.slice(0, 12).map((item) => {
               const isDemoHash =
                 item.txHash.startsWith('0xdemo') || item.txHash.startsWith('0xclaim')
-              const href = isDemoHash
-                ? undefined
-                : explorerTx(env.explorerUrl, item.txHash)
+              const href = isDemoHash ? undefined : explorerTx(explorerUrl, item.txHash)
 
               return (
                 <li
@@ -72,7 +71,7 @@ export function TxHistoryList({
                       }
                     >
                       {item.kind === 'claim' ? '+' : ''}
-                      {formatMon(item.amount)} MON
+                      {formatMon(item.amount)} {gasSymbol}
                     </div>
                     <div className="font-mono text-[0.65rem] uppercase tracking-[0.16em] text-muted-2">
                       {item.kind}

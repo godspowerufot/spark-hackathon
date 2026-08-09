@@ -23,25 +23,67 @@ function upsertEnvVar(filePath: string, key: string, value: string) {
   fs.writeFileSync(filePath, content, 'utf8')
 }
 
+type NetworkMeta = {
+  gasSymbol: string
+  addressKey: string
+  deployBlockKey: string
+  ledgerKey: string
+  legacyAddressKey?: string
+  legacyDeployBlockKey?: string
+}
+
+const NETWORK_META: Record<string, NetworkMeta> = {
+  '10143': {
+    gasSymbol: 'MON',
+    addressKey: 'NEXT_PUBLIC_LEDGER_ADDRESS_MONAD',
+    deployBlockKey: 'NEXT_PUBLIC_LEDGER_DEPLOY_BLOCK_MONAD',
+    ledgerKey: 'LEDGER_ADDRESS_MONAD',
+    legacyAddressKey: 'NEXT_PUBLIC_LEDGER_ADDRESS',
+    legacyDeployBlockKey: 'NEXT_PUBLIC_LEDGER_DEPLOY_BLOCK',
+  },
+  '5042002': {
+    gasSymbol: 'USDC',
+    addressKey: 'NEXT_PUBLIC_LEDGER_ADDRESS_ARC',
+    deployBlockKey: 'NEXT_PUBLIC_LEDGER_DEPLOY_BLOCK_ARC',
+    ledgerKey: 'LEDGER_ADDRESS_ARC',
+  },
+  '143': {
+    gasSymbol: 'MON',
+    addressKey: 'NEXT_PUBLIC_LEDGER_ADDRESS_MONAD_MAINNET',
+    deployBlockKey: 'NEXT_PUBLIC_LEDGER_DEPLOY_BLOCK_MONAD_MAINNET',
+    ledgerKey: 'LEDGER_ADDRESS_MONAD_MAINNET',
+  },
+}
+
 async function main() {
   const [deployer] = await ethers.getSigners()
   if (!deployer) {
     throw new Error('No deployer account. Set PRIVATE_KEY in contracts/.env')
   }
 
+  const network = await ethers.provider.getNetwork()
+  const chainId = network.chainId.toString()
+  const meta = NETWORK_META[chainId]
+  if (!meta) {
+    throw new Error(`Unsupported chainId ${chainId}. Use monadTestnet or arcTestnet.`)
+  }
+
   const maxClaim =
     process.env.MAX_CLAIM_WEI != null
       ? BigInt(process.env.MAX_CLAIM_WEI)
-      : ethers.parseEther('0.01')
+      : ethers.parseEther(chainId === '5042002' ? '0.1' : '0.01')
 
   const balance = await ethers.provider.getBalance(deployer.address)
-  console.log('Network:', (await ethers.provider.getNetwork()).chainId.toString())
+  console.log('Network:', chainId)
   console.log('Deployer:', deployer.address)
-  console.log('Deployer balance:', ethers.formatEther(balance), 'MON')
+  console.log('Deployer balance:', ethers.formatEther(balance), meta.gasSymbol)
   console.log('Max claim (wei):', maxClaim.toString())
 
   if (balance === 0n) {
-    throw new Error('Deployer has 0 MON. Fund the wallet on Monad testnet first.')
+    throw new Error(
+      `Deployer has 0 ${meta.gasSymbol}. Fund the wallet first` +
+        (chainId === '5042002' ? ' via https://faucet.circle.com (Arc Testnet).' : '.'),
+    )
   }
 
   const factory = await ethers.getContractFactory('GasSponsorLedger')
@@ -58,21 +100,26 @@ async function main() {
   console.log('GasSponsorLedger deployed at:', address)
   console.log('Owner:', owner)
   console.log('Deploy block:', deployBlock)
-  console.log('Max claim:', ethers.formatEther(stats[1]), 'MON')
+  console.log('Max claim:', ethers.formatEther(stats[1]), meta.gasSymbol)
 
   const webEnvPath = path.resolve(__dirname, '../../apps/web/.env.local')
-  upsertEnvVar(webEnvPath, 'NEXT_PUBLIC_LEDGER_ADDRESS', address)
-  upsertEnvVar(webEnvPath, 'NEXT_PUBLIC_LEDGER_DEPLOY_BLOCK', String(deployBlock))
-  console.log('Updated', webEnvPath, 'with NEXT_PUBLIC_LEDGER_ADDRESS + DEPLOY_BLOCK')
+  upsertEnvVar(webEnvPath, meta.addressKey, address)
+  upsertEnvVar(webEnvPath, meta.deployBlockKey, String(deployBlock))
+  if (meta.legacyAddressKey) upsertEnvVar(webEnvPath, meta.legacyAddressKey, address)
+  if (meta.legacyDeployBlockKey) {
+    upsertEnvVar(webEnvPath, meta.legacyDeployBlockKey, String(deployBlock))
+  }
+  console.log('Updated', webEnvPath)
 
   const contractsEnvPath = path.resolve(__dirname, '../.env')
+  upsertEnvVar(contractsEnvPath, meta.ledgerKey, address)
   upsertEnvVar(contractsEnvPath, 'LEDGER_ADDRESS', address)
-  console.log('Updated', contractsEnvPath, 'with LEDGER_ADDRESS')
+  console.log('Updated', contractsEnvPath)
 
   console.log('\nNext steps:')
   console.log('1. Restart the Next.js dev server')
-  console.log('2. Open /sponsor and deposit MON')
-  console.log('3. Open /claim from another wallet (or same after funding)')
+  console.log(`2. Switch wallet to this chain and deposit ${meta.gasSymbol} on /sponsor`)
+  console.log('3. Open /claim from a fresh wallet')
 }
 
 main().catch((error) => {

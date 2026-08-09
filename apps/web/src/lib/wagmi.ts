@@ -16,14 +16,17 @@ import {
   uniswapWallet,
 } from '@rainbow-me/rainbowkit/wallets'
 import { createConfig, fallback, http } from 'wagmi'
-import { activeChain, env, monadMainnet, monadTestnet } from '@/config/env'
+import {
+  arcTestnet,
+  env,
+  monadMainnet,
+  monadTestnet,
+} from '@/config/env'
 
 /**
  * `injectedWallet` auto-detects any browser extension wallet, and
  * `walletConnectWallet` supports every WalletConnect-compatible wallet
  * (300+ mobile/desktop wallets) — so any wallet can connect.
- * The named entries below just give popular ones first-class buttons.
- * Coinbase Base Account is intentionally excluded (pulls optional @x402/* deps).
  */
 const connectors = connectorsForWallets(
   [
@@ -49,26 +52,38 @@ const connectors = connectorsForWallets(
 /**
  * Browser traffic goes through a same-origin `/api/rpc` proxy so ad blockers /
  * extensions cannot break Alchemy `fetch`. Server-side still talks upstream.
+ * Pass `?chainId=` so the proxy picks Monad vs Arc.
  */
-function rpcTransport(upstream: string) {
-  const browserProxy = '/api/rpc'
-  const url = typeof window === 'undefined' ? upstream : browserProxy
+function rpcTransport(chainId: number, upstreams: string[]) {
+  const browserProxy = `/api/rpc?chainId=${chainId}`
+  const primary = typeof window === 'undefined' ? upstreams[0] : browserProxy
+  const rest = typeof window === 'undefined' ? upstreams.slice(1) : upstreams
   return fallback([
-    http(url, { retryCount: 3, timeout: 20_000 }),
-    http(upstream, { retryCount: 1, timeout: 20_000 }),
-    http('https://testnet-rpc.monad.xyz', { retryCount: 1, timeout: 20_000 }),
+    http(primary, { retryCount: 3, timeout: 20_000 }),
+    ...rest.map((url) => http(url, { retryCount: 1, timeout: 20_000 })),
   ])
 }
 
+const monadUpstreams = [
+  env.defaultChainId === monadTestnet.id
+    ? process.env.NEXT_PUBLIC_RPC_URL_MONAD || process.env.NEXT_PUBLIC_RPC_URL || monadTestnet.rpcUrls.default.http[0]
+    : monadTestnet.rpcUrls.default.http[0],
+  'https://monad-testnet.drpc.org',
+  'https://testnet-rpc.monad.xyz',
+].filter(Boolean) as string[]
+
+const arcUpstreams = [
+  process.env.NEXT_PUBLIC_RPC_URL_ARC || 'https://rpc.testnet.arc.network',
+]
+
 export const wagmiConfig = createConfig({
   connectors,
-  chains: [activeChain, activeChain.id === monadTestnet.id ? monadMainnet : monadTestnet],
+  chains: [monadTestnet, arcTestnet, monadMainnet],
   transports: {
-    [monadTestnet.id]: rpcTransport(
-      env.chainId === monadTestnet.id ? env.rpcUrl : monadTestnet.rpcUrls.default.http[0],
-    ),
+    [monadTestnet.id]: rpcTransport(monadTestnet.id, [...new Set(monadUpstreams)]),
+    [arcTestnet.id]: rpcTransport(arcTestnet.id, [...new Set(arcUpstreams)]),
     [monadMainnet.id]: http(
-      env.chainId === monadMainnet.id ? env.rpcUrl : monadMainnet.rpcUrls.default.http[0],
+      process.env.NEXT_PUBLIC_RPC_URL_MONAD_MAINNET || monadMainnet.rpcUrls.default.http[0],
       { retryCount: 2, timeout: 20_000 },
     ),
   },

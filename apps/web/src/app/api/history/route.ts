@@ -1,22 +1,11 @@
 import { NextResponse } from 'next/server'
 import { decodeEventLog, type Address, type Hex } from 'viem'
 import { gasSponsorLedgerAbi } from '@/contracts/abi'
+import { getChainConfig, isSupportedAppChain, monadTestnet } from '@/config/chains'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-const LEDGER_ADDRESS = (process.env.NEXT_PUBLIC_LEDGER_ADDRESS || '') as Address | ''
-const DEPLOY_BLOCK = BigInt(process.env.NEXT_PUBLIC_LEDGER_DEPLOY_BLOCK || '0')
-
-/**
- * Free-tier getLogs limits: Alchemy = 10 blocks, Monad public = 100, dRPC = 1000.
- * dRPC (keyless) gives the widest window, so history scans go through it,
- * falling back to the public RPC with smaller chunks.
- */
-const SCAN_SOURCES = [
-  { url: 'https://monad-testnet.drpc.org', chunk: 1000n },
-  { url: 'https://testnet-rpc.monad.xyz', chunk: 100n },
-]
 const CONCURRENCY = 5
 /** If deploy block is unknown, only scan this far back. */
 const DEFAULT_LOOKBACK = 100_000n
@@ -101,7 +90,7 @@ function decodeLogs(logs: RawLog[]): HistoryEvent[] {
         })
       }
     } catch {
-      // Non-ledger events (e.g. OwnershipTransferred) or undecodable logs — skip.
+      // Non-ledger events — skip.
     }
   }
   return events
@@ -140,22 +129,30 @@ async function scanRange(
   return events
 }
 
-export async function GET() {
-  if (!LEDGER_ADDRESS) {
-    return NextResponse.json({ deposits: [], claims: [], demo: true })
+export async function GET(request: Request) {
+  const url = new URL(request.url)
+  const chainIdParam = Number(url.searchParams.get('chainId') || monadTestnet.id)
+  const chainId = isSupportedAppChain(chainIdParam) ? chainIdParam : monadTestnet.id
+  const cfg = getChainConfig(chainId)
+  const ledgerAddress = cfg.ledgerAddress
+  const deployBlock = cfg.deployBlock
+
+  if (!ledgerAddress) {
+    return NextResponse.json({ deposits: [], claims: [], demo: true, chainId })
   }
 
+  const cacheKey = `${chainId}:${ledgerAddress}`
   let lastError: string | null = null
 
-  for (const source of SCAN_SOURCES) {
+  for (const source of cfg.historyScanSources) {
     try {
       const latestHex = (await rpcCall(source.url, 'eth_blockNumber', [])) as Hex
       const latest = BigInt(latestHex)
 
-      const entry = cache.get(LEDGER_ADDRESS) ?? {
+      const entry = cache.get(cacheKey) ?? {
         cursor:
-          DEPLOY_BLOCK > 0n
-            ? DEPLOY_BLOCK
+          deployBlock > 0n
+            ? deployBlock
             : latest > DEFAULT_LOOKBACK
               ? latest - DEFAULT_LOOKBACK
               : 0n,
@@ -163,7 +160,7 @@ export async function GET() {
       }
 
       if (entry.cursor <= latest) {
-        const fresh = await scanRange(source, LEDGER_ADDRESS, entry.cursor, latest)
+        const fresh = await scanRange(source, ledgerAddress, entry.cursor, latest)
         const seen = new Set(entry.events.map((e) => `${e.txHash}-${e.logIndex}`))
         for (const event of fresh) {
           const key = `${event.txHash}-${event.logIndex}`
@@ -173,7 +170,7 @@ export async function GET() {
           }
         }
         entry.cursor = latest + 1n
-        cache.set(LEDGER_ADDRESS, entry)
+        cache.set(cacheKey, entry)
       }
 
       const sorted = [...entry.events].sort(
@@ -184,14 +181,14 @@ export async function GET() {
         deposits: sorted.filter((e) => e.kind === 'deposit'),
         claims: sorted.filter((e) => e.kind === 'claim'),
         scannedTo: (entry.cursor - 1n).toString(),
+        chainId,
       })
     } catch (error) {
       lastError = error instanceof Error ? error.message : 'scan failed'
     }
   }
 
-  // All sources failed — return whatever is cached rather than nothing.
-  const entry = cache.get(LEDGER_ADDRESS)
+  const entry = cache.get(cacheKey)
   const sorted = [...(entry?.events ?? [])].sort(
     (a, b) => Number(BigInt(b.blockNumber) - BigInt(a.blockNumber)) || b.logIndex - a.logIndex,
   )
@@ -200,6 +197,7 @@ export async function GET() {
       deposits: sorted.filter((e) => e.kind === 'deposit'),
       claims: sorted.filter((e) => e.kind === 'claim'),
       error: lastError,
+      chainId,
     },
     { status: entry ? 200 : 502 },
   )

@@ -1,20 +1,12 @@
 import { NextResponse } from 'next/server'
+import { CHAIN_CONFIGS, getChainConfig, monadTestnet } from '@/config/chains'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-function upstreams(): string[] {
-  const list = [
-    process.env.NEXT_PUBLIC_RPC_URL,
-    process.env.NEXT_PUBLIC_ALCHEMY_API_KEY &&
-    process.env.NEXT_PUBLIC_ALCHEMY_API_KEY !== 'YOUR_ALCHEMY_API_KEY'
-      ? `https://monad-testnet.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY}`
-      : null,
-    'https://monad-testnet.drpc.org',
-    'https://testnet-rpc.monad.xyz',
-  ].filter((u): u is string => Boolean(u))
-
-  return [...new Set(list)]
+function upstreams(chainId: number): string[] {
+  const cfg = CHAIN_CONFIGS[chainId] ?? getChainConfig(monadTestnet.id)
+  return cfg.rpcUrls
 }
 
 async function proxy(body: string, upstream: string) {
@@ -29,6 +21,9 @@ async function proxy(body: string, upstream: string) {
 }
 
 export async function POST(request: Request) {
+  const url = new URL(request.url)
+  const chainId = Number(url.searchParams.get('chainId') || process.env.NEXT_PUBLIC_DEFAULT_CHAIN_ID || monadTestnet.id)
+
   let body: string
   try {
     body = await request.text()
@@ -41,9 +36,9 @@ export async function POST(request: Request) {
   }
 
   let lastError = 'RPC proxy failed'
-  for (const url of upstreams()) {
+  for (const rpc of upstreams(chainId)) {
     try {
-      const result = await proxy(body, url)
+      const result = await proxy(body, rpc)
       if (result.ok) {
         return new NextResponse(result.text, {
           status: 200,

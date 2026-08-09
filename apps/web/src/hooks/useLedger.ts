@@ -10,14 +10,11 @@ import {
   useWaitForTransactionReceipt,
   useWriteContract,
 } from 'wagmi'
-import { env } from '@/config/env'
+import { getChainConfig, isSupportedAppChain } from '@/config/chains'
 import { gasSponsorLedgerAbi } from '@/contracts/abi'
 import { demoLedger, type LedgerStats } from '@/services/demoLedger'
 import { humanError } from '@/lib/utils'
 import toast from 'react-hot-toast'
-
-const ledgerAddress = env.ledgerAddress as Address | undefined
-const enabledOnchain = Boolean(ledgerAddress)
 
 export type LedgerEventKind = 'deposit' | 'claim'
 
@@ -38,11 +35,34 @@ function invalidateLedger(qc: ReturnType<typeof useQueryClient>) {
   ])
 }
 
+export function useActiveLedger() {
+  const { chainId } = useAccount()
+  const supported = isSupportedAppChain(chainId)
+  const cfg = getChainConfig(supported ? chainId : undefined)
+  const ledgerAddress = (supported ? cfg.ledgerAddress : '') as Address | undefined
+  const enabledOnchain = Boolean(ledgerAddress) && supported
+
+  return {
+    chainId: cfg.id,
+    cfg,
+    gasSymbol: cfg.gasSymbol,
+    chainLabel: cfg.label,
+    explorerUrl: cfg.explorerUrl,
+    ledgerAddress,
+    enabledOnchain,
+    supported,
+  }
+}
+
 export function useTreasury() {
+  const { ledgerAddress, enabledOnchain, gasSymbol, explorerUrl, cfg, chainId, supported } =
+    useActiveLedger()
+
   const onchainStats = useReadContract({
     address: ledgerAddress,
     abi: gasSponsorLedgerAbi,
     functionName: 'getStats',
+    chainId,
     query: { enabled: enabledOnchain, refetchInterval: 12_000 },
   })
 
@@ -50,6 +70,7 @@ export function useTreasury() {
     address: ledgerAddress,
     abi: gasSponsorLedgerAbi,
     functionName: 'owner',
+    chainId,
     query: { enabled: enabledOnchain, refetchInterval: 60_000 },
   })
 
@@ -71,7 +92,9 @@ export function useTreasury() {
           usersHelped: raw[4],
           depositCount: raw[5],
           paused: raw[6],
-          owner: (onchainOwner.data as Address | undefined) ?? ('0x0000000000000000000000000000000000000000' as Address),
+          owner:
+            (onchainOwner.data as Address | undefined) ??
+            ('0x0000000000000000000000000000000000000000' as Address),
         }
       : undefined
 
@@ -84,6 +107,11 @@ export function useTreasury() {
       },
       demo: false,
       ledgerAddress,
+      gasSymbol,
+      explorerUrl,
+      chainLabel: cfg.label,
+      chainId,
+      supported,
     }
   }
 
@@ -94,15 +122,23 @@ export function useTreasury() {
     refetch: demo.refetch,
     demo: true,
     ledgerAddress: undefined,
+    gasSymbol,
+    explorerUrl,
+    chainLabel: cfg.label,
+    chainId,
+    supported,
   }
 }
 
 export function useCanClaim(address?: Address) {
+  const { ledgerAddress, enabledOnchain, chainId } = useActiveLedger()
+
   const onchain = useReadContract({
     address: ledgerAddress,
     abi: gasSponsorLedgerAbi,
     functionName: 'canClaim',
     args: address ? [address] : undefined,
+    chainId,
     query: { enabled: enabledOnchain && Boolean(address), refetchInterval: 8_000 },
   })
 
@@ -120,11 +156,14 @@ export function useCanClaim(address?: Address) {
 }
 
 export function useHasClaimed(address?: Address) {
+  const { ledgerAddress, enabledOnchain, chainId } = useActiveLedger()
+
   const onchain = useReadContract({
     address: ledgerAddress,
     abi: gasSponsorLedgerAbi,
     functionName: 'hasClaimed',
     args: address ? [address] : undefined,
+    chainId,
     query: { enabled: enabledOnchain && Boolean(address), refetchInterval: 8_000 },
   })
 
@@ -143,6 +182,7 @@ export function useHasClaimed(address?: Address) {
 export function useDeposit() {
   const qc = useQueryClient()
   const { address } = useAccount()
+  const { ledgerAddress, enabledOnchain, gasSymbol, chainLabel } = useActiveLedger()
   const { writeContractAsync, data: hash, isPending, reset } = useWriteContract()
   const receipt = useWaitForTransactionReceipt({ hash })
 
@@ -150,18 +190,18 @@ export function useDeposit() {
     if (!ledgerAddress || !hash) return
     if (receipt.isSuccess) {
       void invalidateLedger(qc)
-      toast.success('Deposit confirmed on Monad.', { id: 'deposit' })
+      toast.success(`Deposit confirmed on ${chainLabel}.`, { id: 'deposit' })
       reset()
     } else if (receipt.isError) {
       toast.error('Deposit transaction failed.', { id: 'deposit' })
       reset()
     }
-  }, [hash, qc, receipt.isError, receipt.isSuccess, reset])
+  }, [chainLabel, hash, ledgerAddress, qc, receipt.isError, receipt.isSuccess, reset])
 
   const demoMutation = useMutation({
-    mutationFn: async (amountMon: string) => {
+    mutationFn: async (amount: string) => {
       if (!address) throw new Error('Connect wallet first.')
-      const wei = parseEther(amountMon)
+      const wei = parseEther(amount)
       demoLedger.deposit(address, wei)
       return { hash: '0xdemo' as Hex }
     },
@@ -172,9 +212,9 @@ export function useDeposit() {
     onError: (e) => toast.error(humanError(e)),
   })
 
-  async function deposit(amountMon: string) {
-    if (!amountMon || Number(amountMon) <= 0) {
-      toast.error('Enter a valid MON amount.')
+  async function deposit(amount: string) {
+    if (!amount || Number(amount) <= 0) {
+      toast.error(`Enter a valid ${gasSymbol} amount.`)
       return
     }
 
@@ -182,7 +222,7 @@ export function useDeposit() {
       try {
         if (!ledgerAddress) throw new Error('Ledger not configured')
         if (!address) throw new Error('Connect wallet first.')
-        const wei = parseEther(amountMon)
+        const wei = parseEther(amount)
         toast.loading('Confirm deposit in wallet…', { id: 'deposit' })
         const tx = await writeContractAsync({
           address: ledgerAddress,
@@ -198,7 +238,7 @@ export function useDeposit() {
       }
     }
 
-    return demoMutation.mutateAsync(amountMon)
+    return demoMutation.mutateAsync(amount)
   }
 
   return {
@@ -207,12 +247,14 @@ export function useDeposit() {
       ? isPending || Boolean(hash && receipt.isLoading)
       : demoMutation.isPending,
     hash,
+    gasSymbol,
   }
 }
 
 export function useClaim() {
   const qc = useQueryClient()
   const { address } = useAccount()
+  const { ledgerAddress, enabledOnchain, gasSymbol, chainId, chainLabel } = useActiveLedger()
   const { signMessageAsync } = useSignMessage()
   const { writeContractAsync, data: hash, isPending, reset } = useWriteContract()
   const receipt = useWaitForTransactionReceipt({ hash })
@@ -223,13 +265,13 @@ export function useClaim() {
     if (!ledgerAddress || !hash) return
     if (receipt.isSuccess) {
       void invalidateLedger(qc)
-      toast.success('Gas claimed on Monad.', { id: 'claim' })
+      toast.success(`Gas claimed on ${chainLabel}.`, { id: 'claim' })
       reset()
     } else if (receipt.isError) {
       toast.error('Claim transaction failed.', { id: 'claim' })
       reset()
     }
-  }, [hash, qc, receipt.isError, receipt.isSuccess, reset])
+  }, [chainLabel, hash, ledgerAddress, qc, receipt.isError, receipt.isSuccess, reset])
 
   const demoMutation = useMutation({
     mutationFn: async () => {
@@ -243,10 +285,6 @@ export function useClaim() {
     onError: (e) => toast.error(humanError(e)),
   })
 
-  /**
-   * Gasless path: user signs a free message, server/relayer pays gas and
-   * calls claimFor(recipient). This is how zero-MON wallets actually onboard.
-   */
   async function claimGasless() {
     if (!address) {
       toast.error('Connect wallet first.')
@@ -264,7 +302,7 @@ export function useClaim() {
         'SparkGas — gasless claim',
         `Recipient: ${address}`,
         `Contract: ${ledgerAddress}`,
-        `Chain ID: ${env.chainId}`,
+        `Chain ID: ${chainId}`,
       ].join('\n')
 
       const signature = await signMessageAsync({ message })
@@ -273,7 +311,7 @@ export function useClaim() {
       const res = await fetch('/api/relay-claim', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recipient: address, signature }),
+        body: JSON.stringify({ recipient: address, signature, chainId }),
       })
       const json = (await res.json()) as { hash?: Hex; error?: string }
       if (!res.ok || !json.hash) {
@@ -282,7 +320,7 @@ export function useClaim() {
 
       setGaslessHash(json.hash)
       await invalidateLedger(qc)
-      toast.success('Gas claimed — MON is in your wallet. No gas paid.', { id: 'claim' })
+      toast.success(`Gas claimed — ${gasSymbol} is in your wallet. No gas paid.`, { id: 'claim' })
       return json.hash
     } catch (e) {
       toast.error(humanError(e), { id: 'claim' })
@@ -292,7 +330,6 @@ export function useClaim() {
     }
   }
 
-  /** Fallback: user pays gas themselves (requires existing MON). */
   async function claimSelfPay() {
     if (enabledOnchain) {
       try {
@@ -322,6 +359,7 @@ export function useClaim() {
       : demoMutation.isPending,
     hash: gaslessHash ?? hash,
     gasless: enabledOnchain,
+    gasSymbol,
   }
 }
 
@@ -335,17 +373,11 @@ interface HistoryApiEvent {
   logIndex: number
 }
 
-/**
- * Event history comes from the `/api/history` server route, which scans
- * logs since the deploy block in provider-safe chunks and caches results.
- * Free-tier RPCs cap `eth_getLogs` at 10–1000 blocks, so scanning from the
- * browser directly would either miss old deposits or spam the provider.
- */
-async function fetchOnchainHistory(): Promise<{
+async function fetchOnchainHistory(chainId: number): Promise<{
   deposits: LedgerHistoryItem[]
   claims: LedgerHistoryItem[]
 }> {
-  const res = await fetch('/api/history', { cache: 'no-store' })
+  const res = await fetch(`/api/history?chainId=${chainId}`, { cache: 'no-store' })
   if (!res.ok) throw new Error('Failed to load ledger history')
   const json = (await res.json()) as {
     deposits: HistoryApiEvent[]
@@ -369,9 +401,11 @@ async function fetchOnchainHistory(): Promise<{
 }
 
 export function useLedgerHistory() {
+  const { ledgerAddress, enabledOnchain, chainId } = useActiveLedger()
+
   const onchain = useQuery({
-    queryKey: ['gsl', 'onchain', 'history', ledgerAddress],
-    queryFn: fetchOnchainHistory,
+    queryKey: ['gsl', 'onchain', 'history', chainId, ledgerAddress],
+    queryFn: () => fetchOnchainHistory(chainId),
     enabled: enabledOnchain,
     refetchInterval: 12_000,
   })
