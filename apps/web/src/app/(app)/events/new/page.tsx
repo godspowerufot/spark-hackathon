@@ -44,7 +44,7 @@ export default function CreateEventPage() {
   const [venue, setVenue] = useState('')
   const [vipPriceUsdc, setVipPriceUsdc] = useState('0.05')
   const [vipLabel, setVipLabel] = useState('VIP Pass')
-  const [coverGradient, setCoverGradient] = useState(EVENT_COVERS[0].value)
+  const [coverGradient, setCoverGradient] = useState<string>(EVENT_COVERS[0].value)
 
   const previewName = name.trim() || 'Your event'
   const previewSlug = slugifyEventId(name || 'your-event')
@@ -291,7 +291,7 @@ export default function CreateEventPage() {
                   <div className="rounded-xl border border-hair bg-glass px-4 py-3 text-sm text-muted">
                     <div className="flex justify-between gap-3">
                       <span>Merchant</span>
-                      <span className="font-mono text-ink">{shortAddress(address, 5)}</span>
+                      <span className="font-mono text-ink">{shortAddress(address ?? '', 5)}</span>
                     </div>
                     <div className="mt-2 flex justify-between gap-3">
                       <span>Network</span>

@@ -41,7 +41,10 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       action?: 'seed' | 'upsert' | 'create'
       event?: SparkEvent
-    } & Partial<CreateBody>
+      draft?: CreateBody['draft']
+      merchantAddress?: string
+      signature?: Hex
+    }
 
     if (body.action === 'seed') {
       const payment =
