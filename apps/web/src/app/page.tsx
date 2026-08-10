@@ -26,7 +26,6 @@ export default function LandingPage() {
       />
       <SiteHeader marketing />
 
-      {/* Hero: brand + one line + one sentence + CTAs + full-bleed video */}
       <section className="relative flex min-h-screen items-center justify-center overflow-hidden px-6 pt-24 text-center">
         <video
           autoPlay
@@ -60,53 +59,52 @@ export default function LandingPage() {
             <TypewriterHeadline />
           </div>
           <p className="mx-auto mt-7 max-w-lg text-[1.05rem] font-light leading-relaxed text-ink/85">
-            On Arc, sponsored USDC is gas and ticket money — claim once, buy VIP, prove it with a
-            scan.
+            Autonomous agents sign a buy-vip intent, pay in USDC on Arc, and prove the ticket with a
+            scan — Agentic Economy, event ticketing.
           </p>
           <div className="mt-10 flex flex-wrap justify-center gap-4">
-            <Link href="/events">
-              <Button size="lg">Browse events</Button>
+            <Link href="/agent">
+              <Button size="lg">Open agent desk</Button>
             </Link>
-            <Link href="/events/new">
+            <Link href="/events">
               <Button size="lg" variant="secondary">
-                List an event
+                Browse events
               </Button>
             </Link>
           </div>
         </motion.div>
       </section>
 
-      {/* One job: the guest path */}
       <section className="px-6 py-28" id="how">
         <div className="mx-auto max-w-5xl">
           <motion.div className="max-w-2xl" {...fadeUp}>
             <div className="font-mono text-[0.66rem] uppercase tracking-[0.3em] text-gold">
-              Event mode
+              Agentic Economy
             </div>
             <h2 className="mt-3 font-display text-3xl font-semibold sm:text-4xl">
-              Three moves to the door
+              Event listed → agent buys
             </h2>
             <p className="mt-3 text-muted">
-              Sponsors fill the vault. Guests never need a faucet. Merchants get an on-chain VIP
-              payment they can verify with QR.
+              Merchants publish. The Arc agent wallet reacts on its own: signed intent, USDC settle,
+              QR proof. No dispatch click.
             </p>
           </motion.div>
           <div className="mt-14 grid gap-10 md:grid-cols-3">
             {[
               {
                 n: '01',
-                t: 'Claim',
-                d: 'Sign once on Arc. The relayer pays gas so a zero-balance wallet can start.',
+                t: 'List event',
+                d: 'Merchant publishes a VIP night. That create is the only human trigger.',
               },
               {
                 n: '02',
-                t: 'Buy VIP',
-                d: 'Spend that same USDC through FirstPayment. Memo locks the purchase to the event.',
+                t: 'Agent auto-buys',
+                d: 'Server agent signs buy-vip intent, claims gas if needed, pays USDC on Arc.',
               },
               {
                 n: '03',
-                t: 'Scan',
-                d: 'Your foil pass carries a QR. Door staff open verify — the Arc tx must match.',
+                t: 'Verify ticket',
+                d: 'QR opens door check — on-chain purchase + intent signature must match.',
               },
             ].map((step, i) => (
               <motion.div
@@ -125,13 +123,12 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* One job: why Arc */}
       <section
         className="relative overflow-hidden border-y border-hair px-6 py-28"
         id="arc"
         style={{
           background:
-            'radial-gradient(ellipse at 20% 50%, rgba(212,175,55,0.08), transparent 50%), radial-gradient(ellipse at 80% 30%, rgba(0,208,132,0.06), transparent 45%), #070707',
+            'radial-gradient(ellipse at 20% 50%, rgba(212,175,55,0.08), transparent 50%), #070707',
         }}
       >
         <div className="mx-auto max-w-5xl">
@@ -140,44 +137,12 @@ export default function LandingPage() {
               Why Arc
             </div>
             <h2 className="mt-3 font-display text-3xl font-semibold sm:text-4xl">
-              Gas is the currency
+              Agents pay with gas money
             </h2>
             <p className="mt-4 text-lg leading-relaxed text-muted">
-              Arc uses native USDC for gas. SparkGas sponsors that USDC so a guest can claim, then
-              pay VIP without bridging or wrapping — the product story only works if money and gas
-              are the same asset.
+              Native USDC on Arc means the same balance pays gas and the VIP ticket — the agentic
+              story without wrapping or a second token.
             </p>
-            <p className="mt-4 text-sm text-muted-2">
-              Monad remains the classic gas-sponsorship demo. Event Mode lives on Arc.
-            </p>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* One job: merchants */}
-      <section className="px-6 py-28" id="merchants">
-        <div className="mx-auto flex max-w-5xl flex-col gap-10 md:flex-row md:items-end md:justify-between">
-          <motion.div className="max-w-xl" {...fadeUp}>
-            <div className="font-mono text-[0.66rem] uppercase tracking-[0.3em] text-gold">
-              Merchants
-            </div>
-            <h2 className="mt-3 font-display text-3xl font-semibold sm:text-4xl">
-              List a night. Get paid on-chain.
-            </h2>
-            <p className="mt-4 text-muted">
-              Connect your wallet, set VIP price, publish. Guests buy through the shared checkout;
-              your listing owns the story and the verify link.
-            </p>
-          </motion.div>
-          <motion.div
-            initial={{ opacity: 0, scale: 0.98 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.45 }}
-          >
-            <Link href="/events/new">
-              <Button size="lg">Create event</Button>
-            </Link>
           </motion.div>
         </div>
       </section>
@@ -197,14 +162,14 @@ export default function LandingPage() {
       <section className="px-6 py-32 text-center">
         <motion.div {...fadeUp}>
           <h2 className="font-display text-4xl font-semibold sm:text-5xl">
-            The door can read the chain.
+            List once. Agent settles.
           </h2>
           <p className="mx-auto mt-4 max-w-md text-muted">
-            Passes, payouts, and claims leave a trail — not a screenshot.
+            Auto buy-vip on create. On-chain proof at the door.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-4">
-            <Link href="/events">
-              <Button size="lg">Enter Event Mode</Button>
+            <Link href="/agent">
+              <Button size="lg">Agent desk</Button>
             </Link>
             <Link href="/dashboard">
               <Button size="lg" variant="secondary">
@@ -237,18 +202,18 @@ export default function LandingPage() {
           <div className="font-display font-semibold">
             {APP_NAME}
             <span className="mt-1 block font-mono text-[0.62rem] uppercase tracking-[0.2em] text-muted-2">
-              Event Mode on Arc · Gas sponsorship on Monad
+              Agentic Economy · Arc USDC tickets
             </span>
           </div>
           <div className="flex flex-wrap gap-6 text-sm text-muted">
+            <Link href="/agent" className="hover:text-gold">
+              Agent
+            </Link>
             <Link href="/events" className="hover:text-gold">
               Events
             </Link>
-            <Link href="/events/new" className="hover:text-gold">
-              Create
-            </Link>
-            <Link href="/passes" className="hover:text-gold">
-              Passes
+            <Link href="/verify" className="hover:text-gold">
+              Verify
             </Link>
             <Link href="/sponsor" className="hover:text-gold">
               Sponsor

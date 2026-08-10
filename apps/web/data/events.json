@@ -1,7 +1,36 @@
 {
   "version": 1,
-  "updatedAt": "2026-08-09T00:00:22.408Z",
+  "updatedAt": "2026-08-10T00:09:18.822Z",
   "events": [
+    {
+      "id": "night-virgil",
+      "name": "Night Virgil",
+      "tagline": "claim gas",
+      "description": "Night Virgil on Arc — claim sponsored USDC, buy VIP Pass, verify with QR.",
+      "date": "2026-09-20",
+      "venue": "Abuja",
+      "coverGradient": "linear-gradient(160deg, #0c1210 0%, #1a3328 45%, #050505 100%)",
+      "chainId": 5042002,
+      "vipPriceUsdc": "1",
+      "vipLabel": "VIP Pass",
+      "paymentAddress": "0x3EBFE71f47e9863A273315C0DeE6464099BcD448",
+      "ledgerAddress": "0xaCe8B112D9bf82E0510d999D456576b73F9F12C8",
+      "merchantAddress": "0x6164D9aD8A1d2E3DCEBD1f1b50160aA3D7a6775A",
+      "createdAt": "2026-08-10T00:09:18.363Z",
+      "active": true,
+      "sponsors": [
+        {
+          "name": "Merchant",
+          "tier": "gold",
+          "blurb": "Listed this event"
+        },
+        {
+          "name": "SparkGas",
+          "tier": "community",
+          "blurb": "Gas sponsorship + VIP verify"
+        }
+      ]
+    },
     {
       "id": "solana-summit",
       "name": "Solana summit",

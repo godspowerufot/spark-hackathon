@@ -55,18 +55,18 @@ export function FlowStepper({
 
 export const ONBOARDING_FLOW: FlowStep[] = [
   {
-    id: 'claim',
-    label: 'Claim gas',
-    hint: 'Get sponsored USDC on Arc — sign only, relayer pays.',
+    id: 'intent',
+    label: 'Sign intent',
+    hint: 'Agent authorizes buy-vip for this event.',
   },
   {
     id: 'pay',
-    label: 'Buy VIP',
-    hint: 'Pay event VIP with that USDC. Gas is money.',
+    label: 'Settle USDC',
+    hint: 'Pay VIP on Arc with the same gas money.',
   },
   {
     id: 'done',
-    label: 'VIP pass',
-    hint: 'Shareable card backed by your Arc payment tx.',
+    label: 'Verify',
+    hint: 'QR proves the agent bought this ticket.',
   },
 ]

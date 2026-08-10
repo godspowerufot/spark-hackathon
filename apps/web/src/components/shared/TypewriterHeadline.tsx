@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react'
 
-const BEFORE = 'Claim gas. '
-const HIGHLIGHT = 'Walk in VIP'
+const BEFORE = 'Agents buy. '
+const HIGHLIGHT = 'Arc verifies'
 const AFTER = '.'
 const FULL = BEFORE + HIGHLIGHT + AFTER
 

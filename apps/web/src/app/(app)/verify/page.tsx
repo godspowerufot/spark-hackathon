@@ -14,16 +14,22 @@ function VerifyInner() {
   const tx = search.get('tx') || ''
   const holder = search.get('holder') || ''
   const eventId = search.get('event') || ''
+  const intent = search.get('intent') || ''
+  const msg = search.get('msg') || ''
   const cfg = getChainConfig(arcTestnet.id)
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['verify', tx, holder, eventId],
+    queryKey: ['verify', tx, holder, eventId, intent, msg],
     queryFn: async () => {
       const q = new URLSearchParams({ tx, holder, event: eventId })
+      if (intent) q.set('intent', intent)
+      if (msg) q.set('msg', msg)
       const res = await fetch(`/api/verify?${q}`)
       return res.json() as Promise<{
         ok: boolean
         verified?: boolean
+        agentPurchase?: boolean
+        intentVerified?: boolean | null
         error?: string
         explorerUrl?: string
         pass?: {
@@ -43,9 +49,9 @@ function VerifyInner() {
   if (!tx || !holder) {
     return (
       <Card className="mx-auto max-w-lg">
-        <p className="text-sm text-muted">Invalid verify link. Scan a VIP pass QR.</p>
-        <Link href="/events" className="mt-4 inline-block text-gold hover:underline">
-          Browse events
+        <p className="text-sm text-muted">Invalid verify link. Scan an agent ticket QR.</p>
+        <Link href="/agent" className="mt-4 inline-block text-gold hover:underline">
+          Agent desk
         </Link>
       </Card>
     )
@@ -61,20 +67,23 @@ function VerifyInner() {
     <div className="mx-auto max-w-lg space-y-6">
       <div>
         <div className="font-mono text-[0.66rem] uppercase tracking-[0.3em] text-gold">
-          Door check
+          Agent door check
         </div>
-        <h1 className="mt-2 font-display text-3xl font-semibold">Verify VIP</h1>
+        <h1 className="mt-2 font-display text-3xl font-semibold">Verify ticket</h1>
         <p className="mt-2 text-muted">
-          QR opens this page. We check the Arc transaction for a matching VIP payment.
+          Confirms the Arc VIP payment and, when present, the agent’s signed buy-vip intent.
         </p>
       </div>
 
       <div className="flex flex-wrap gap-2">
         {verified ? (
-          <Badge tone="ok">On-chain verified</Badge>
+          <Badge tone="ok">On-chain purchase verified</Badge>
         ) : (
           <Badge tone="danger">Not verified</Badge>
         )}
+        {data?.agentPurchase ? <Badge tone="gold">Agent purchase</Badge> : null}
+        {data?.intentVerified === true ? <Badge tone="ok">Intent signature valid</Badge> : null}
+        {data?.intentVerified === false ? <Badge tone="danger">Intent invalid</Badge> : null}
       </div>
 
       {verified && data?.pass ? (
@@ -92,7 +101,7 @@ function VerifyInner() {
       ) : (
         <Card className="space-y-3">
           <p className="text-sm text-danger-soft">
-            {data?.error || error?.message || 'Could not verify this pass'}
+            {data?.error || error?.message || 'Could not verify this ticket'}
           </p>
           {data?.explorerUrl || tx ? (
             <a
@@ -108,11 +117,11 @@ function VerifyInner() {
       )}
 
       <div className="flex flex-wrap gap-3">
-        <Link href="/passes">
-          <Button variant="secondary">My passes</Button>
+        <Link href="/agent">
+          <Button variant="secondary">Agent desk</Button>
         </Link>
-        <Link href="/events">
-          <Button variant="ghost">Events</Button>
+        <Link href="/passes">
+          <Button variant="ghost">Passes</Button>
         </Link>
       </div>
     </div>

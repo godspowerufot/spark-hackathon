@@ -2,57 +2,85 @@
 
 import Link from 'next/link'
 import { useQuery } from '@tanstack/react-query'
-import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { Badge, Card, Skeleton } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { VipPassCard } from '@/components/shared/VipPassCard'
-import { useWallet } from '@/hooks/useLedger'
 import { loadLocalPasses, passVerifyPath, type StoredPass } from '@/lib/passes'
 import { getChainConfig, arcTestnet } from '@/config/chains'
+import { shortAddress } from '@/lib/utils'
 import { useMemo, useState } from 'react'
 
 type ApiPass = StoredPass & { paymentId?: string }
 
+type AgentStatus = {
+  configured: boolean
+  agent?: string
+}
+
+/** Agent VIP collection — no wallet connect */
 export default function MyPassesPage() {
-  const { address, isConnected } = useWallet()
   const cfg = getChainConfig(arcTestnet.id)
   const [selected, setSelected] = useState<ApiPass | null>(null)
 
+  const statusQuery = useQuery({
+    queryKey: ['agent-status'],
+    queryFn: async () => {
+      const res = await fetch('/api/agent/buy-vip')
+      return res.json() as Promise<AgentStatus>
+    },
+  })
+
+  const agent = statusQuery.data?.agent
+
   const local = useMemo(
-    () => (address ? loadLocalPasses(address) : []),
-    // refresh when address changes; localStorage read on each mount
+    () => (agent ? loadLocalPasses(agent) : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [address, isConnected],
+    [agent, statusQuery.dataUpdatedAt],
   )
 
   const chainQuery = useQuery({
-    queryKey: ['my-passes', address],
+    queryKey: ['agent-passes', agent],
     queryFn: async () => {
-      const res = await fetch(`/api/passes?address=${address}`)
+      const res = await fetch(`/api/passes?address=${agent}`)
       const json = (await res.json()) as { passes?: ApiPass[]; error?: string }
       if (!res.ok) throw new Error(json.error || 'Failed to load passes')
       return json.passes ?? []
     },
-    enabled: Boolean(address),
-    refetchInterval: 20_000,
+    enabled: Boolean(agent),
+    refetchInterval: 15_000,
   })
 
   const passes = useMemo(() => {
     const map = new Map<string, ApiPass>()
     for (const p of [...(chainQuery.data ?? []), ...local]) {
-      map.set(p.txHash.toLowerCase(), p)
+      map.set(p.txHash.toLowerCase(), { ...p, agent: true })
     }
     return [...map.values()].sort((a, b) => (b.at || 0) - (a.at || 0))
   }, [chainQuery.data, local])
 
-  if (!isConnected || !address) {
+  if (statusQuery.isLoading) {
+    return (
+      <div className="mx-auto max-w-4xl space-y-4">
+        <Skeleton className="h-24" />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Skeleton className="h-40" />
+          <Skeleton className="h-40" />
+        </div>
+      </div>
+    )
+  }
+
+  if (!statusQuery.data?.configured || !agent) {
     return (
       <div className="mx-auto max-w-lg space-y-6 text-center">
-        <h1 className="font-display text-3xl font-semibold">My passes</h1>
-        <p className="text-muted">Connect the wallet that bought VIP to see your cards.</p>
-        <div className="flex justify-center">
-          <ConnectButton />
-        </div>
+        <h1 className="font-display text-3xl font-semibold">Agent passes</h1>
+        <p className="text-muted">
+          Agent key not configured. Set RELAYER_PRIVATE_KEY or AGENT_PRIVATE_KEY, then dispatch a
+          buy from the desk.
+        </p>
+        <Link href="/agent">
+          <Button>Open agent desk</Button>
+        </Link>
       </div>
     )
   }
@@ -62,15 +90,19 @@ export default function MyPassesPage() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <div className="font-mono text-[0.66rem] uppercase tracking-[0.3em] text-gold">
-            Collection
+            Agent collection
           </div>
-          <h1 className="mt-2 font-display text-3xl font-semibold">My VIP passes</h1>
+          <h1 className="mt-2 font-display text-3xl font-semibold">VIP passes bought</h1>
           <p className="mt-2 text-muted">
-            Cards you’ve bought on Arc. Scan the QR to verify the payment on-chain.
+            All tickets purchased by the autonomous agent — no wallet connect.
           </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Badge tone="ok">Agent {shortAddress(agent, 5)}</Badge>
+            <Badge tone="neutral">{passes.length} pass{passes.length === 1 ? '' : 'es'}</Badge>
+          </div>
         </div>
-        <Link href="/events">
-          <Button variant="secondary">Browse events</Button>
+        <Link href="/agent">
+          <Button>Buy another</Button>
         </Link>
       </div>
 
@@ -81,9 +113,9 @@ export default function MyPassesPage() {
         </div>
       ) : passes.length === 0 ? (
         <Card className="space-y-4 text-center">
-          <p className="text-muted">No VIP passes yet for this wallet.</p>
-          <Link href="/events/arc-summit-vip">
-            <Button>Get Arc Summit VIP</Button>
+          <p className="text-muted">No VIP passes yet for this agent.</p>
+          <Link href="/agent">
+            <Button>Dispatch agent</Button>
           </Link>
         </Card>
       ) : (
@@ -98,7 +130,7 @@ export default function MyPassesPage() {
                 onClick={() => setSelected(pass)}
                 className="text-left"
               >
-                <div className={active ? 'ring-1 ring-gold/40 rounded-2xl' : ''}>
+                <div className={active ? 'rounded-2xl ring-1 ring-gold/40' : ''}>
                   <VipPassCard
                     compact
                     eventName={pass.eventName}
@@ -116,8 +148,9 @@ export default function MyPassesPage() {
                     }
                   />
                 </div>
-                <div className="mt-2 flex gap-2">
+                <div className="mt-2 flex flex-wrap gap-2">
                   <Badge tone="ok">On-chain</Badge>
+                  <Badge tone="gold">Agent</Badge>
                   <Link
                     href={verifyPath}
                     className="font-mono text-xs text-gold hover:underline"

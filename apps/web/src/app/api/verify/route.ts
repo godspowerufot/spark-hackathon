@@ -5,6 +5,7 @@ import {
   fallback,
   http,
   isAddress,
+  verifyMessage,
   type Address,
   type Hex,
 } from 'viem'
@@ -17,13 +18,15 @@ import { findEvent, readEventsStore } from '@/lib/jsonbin'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-/** GET /api/verify?tx=0x&holder=0x&event=arc-summit-vip */
+/** GET /api/verify?tx=0x&holder=0x&event=…&intent=0x…&msg=… */
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url)
     const tx = url.searchParams.get('tx') as Hex | null
     const holder = url.searchParams.get('holder') as Address | null
     const eventId = url.searchParams.get('event')
+    const intentSig = url.searchParams.get('intent') as Hex | null
+    const intentMessageParam = url.searchParams.get('msg')
 
     if (!tx || !tx.startsWith('0x')) {
       return NextResponse.json({ ok: false, error: 'Missing tx' }, { status: 400 })
@@ -103,9 +106,29 @@ export async function GET(request: Request) {
     const eid = matched.eventId || eventId || ''
     const event = eid && store ? findEvent(store, eid) : undefined
 
+    let intentVerified: boolean | null = null
+    if (intentSig?.startsWith('0x') && intentMessageParam) {
+      const message = decodeURIComponent(intentMessageParam)
+      const looksLikeBuy =
+        message.includes('buy-vip') &&
+        message.includes(holder.toLowerCase()) &&
+        (!eid || message.includes(eid))
+      if (!looksLikeBuy) {
+        intentVerified = false
+      } else {
+        intentVerified = await verifyMessage({
+          address: holder,
+          message,
+          signature: intentSig,
+        }).catch(() => false)
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       verified: true,
+      agentPurchase: Boolean(intentSig),
+      intentVerified,
       explorerUrl: `${cfg.explorerUrl}/tx/${tx}`,
       pass: {
         eventId: eid,

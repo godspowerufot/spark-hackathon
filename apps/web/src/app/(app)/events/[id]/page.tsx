@@ -153,15 +153,18 @@ export default function EventDetailPage() {
             <div className="flex flex-wrap gap-3">
               {!canAfford ? (
                 <Link href={`/claim?event=${event.id}`}>
-                  <Button>1. Claim gas</Button>
+                  <Button variant="secondary">Claim gas</Button>
                 </Link>
               ) : (
                 <Badge tone="ok">Gas ready</Badge>
               )}
               <Link href={`/events/${event.id}/vip`}>
                 <Button variant={canAfford ? 'primary' : 'secondary'}>
-                  2. Buy {event.vipLabel}
+                  Agent buy · {event.vipLabel}
                 </Button>
+              </Link>
+              <Link href="/agent">
+                <Button variant="ghost">Autonomous desk</Button>
               </Link>
             </div>
           </div>

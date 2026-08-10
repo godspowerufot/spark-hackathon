@@ -22,14 +22,20 @@ export default function EventsPage() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <div className="font-mono text-[0.66rem] uppercase tracking-[0.3em] text-gold">Events</div>
-          <h1 className="mt-2 font-display text-3xl font-semibold">Event mode</h1>
+          <h1 className="mt-2 font-display text-3xl font-semibold">Events agents can buy</h1>
           <p className="mt-2 max-w-2xl text-muted">
-            Sponsors fund the vault. Attendees claim gas, buy VIP, and get a shareable on-chain pass.
+            Listings with VIP prices in USDC. Dispatch an agent or sign intent yourself, then verify
+            on-chain.
           </p>
         </div>
-        <Link href="/events/new">
-          <Button>Create event</Button>
-        </Link>
+        <div className="flex flex-wrap gap-3">
+          <Link href="/agent">
+            <Button>Agent desk</Button>
+          </Link>
+          <Link href="/events/new">
+            <Button variant="secondary">Create event</Button>
+          </Link>
+        </div>
       </div>
 
       {isLoading ? (
