@@ -19,7 +19,6 @@ import {
   slugifyEventId,
 } from '@/types/events'
 import { humanError, shortAddress } from '@/lib/utils'
-import { AgentLiveFeed, makeReply, type AgentReply } from '@/components/shared/AgentLiveFeed'
 
 const STEPS: FlowStep[] = [
   { id: 'basics', label: 'Basics', hint: 'Name, when, and where.' },
@@ -39,7 +38,6 @@ export default function CreateEventPage() {
 
   const [step, setStep] = useState(0)
   const [publishing, setPublishing] = useState(false)
-  const [agentReplies, setAgentReplies] = useState<AgentReply[]>([])
   const [name, setName] = useState('')
   const [tagline, setTagline] = useState('')
   const [date, setDate] = useState('2026-09-20')
@@ -67,10 +65,6 @@ export default function CreateEventPage() {
   async function publish() {
     if (!address) return
     setPublishing(true)
-    setAgentReplies([
-      makeReply('Merchant signed. Event publishing…'),
-      makeReply('Agent waking — no operator dispatch…', 'warn'),
-    ])
     try {
       const message = createEventSignMessage({
         merchantAddress: address,
@@ -79,10 +73,6 @@ export default function CreateEventPage() {
         vipPriceUsdc,
       })
       const signature = await signMessageAsync({ message })
-      setAgentReplies((prev) => [
-        ...prev,
-        makeReply('Listing saved. Agent signing buy-vip intent…', 'info'),
-      ])
       const res = await fetch('/api/events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -105,33 +95,12 @@ export default function CreateEventPage() {
         ok?: boolean
         event?: { id: string }
         error?: string
-        agentPurchase?: { txHash: string; verifyPath: string; amountLabel?: string } | null
-        agentError?: string | null
       }
       if (!res.ok || !json.event) throw new Error(json.error || 'Create failed')
 
-      if (json.agentPurchase?.txHash) {
-        setAgentReplies((prev) => [
-          ...prev,
-          makeReply(
-            `Agent settled ${json.agentPurchase?.amountLabel || 'VIP'} on Arc · auto-buy complete`,
-            'ok',
-          ),
-        ])
-        toast.success('Event live — agent auto-bought VIP')
-        await new Promise((r) => setTimeout(r, 900))
-        router.push(json.agentPurchase.verifyPath || `/events/${json.event.id}`)
-      } else if (json.agentError) {
-        setAgentReplies((prev) => [...prev, makeReply(json.agentError!, 'error')])
-        toast.success('Event live')
-        toast.error(`Agent auto-buy: ${json.agentError}`)
-        router.push(`/events/${json.event.id}`)
-      } else {
-        toast.success('Event live on Arc')
-        router.push(`/events/${json.event.id}`)
-      }
+      toast.success('Event live — dispatch the agent to buy VIP')
+      router.push(`/agent?event=${encodeURIComponent(json.event.id)}`)
     } catch (e) {
-      setAgentReplies((prev) => [...prev, makeReply(humanError(e), 'error')])
       toast.error(humanError(e))
     } finally {
       setPublishing(false)
@@ -153,8 +122,8 @@ export default function CreateEventPage() {
           </div>
           <h1 className="mt-2 font-display text-3xl font-semibold sm:text-4xl">List on Arc</h1>
           <p className="mt-2 max-w-xl text-muted">
-            Publish an event and the Arc agent buys VIP automatically — signs intent, settles USDC,
-            no dispatch click.
+            Publish a VIP night as the merchant. Then open the agent desk and dispatch the Arc
+            wallet agent to buy the ticket.
           </p>
         </div>
         <ChainSwitcher />
@@ -357,16 +326,9 @@ export default function CreateEventPage() {
                       disabled={publishing || !canNextBasics || !canNextVip}
                       onClick={() => void publish()}
                     >
-                      {publishing ? 'Agent settling…' : 'Sign & publish'}
+                      {publishing ? 'Publishing…' : 'Sign & publish'}
                     </Button>
                   </div>
-                  {agentReplies.length > 0 || publishing ? (
-                    <AgentLiveFeed
-                      replies={agentReplies}
-                      live={publishing}
-                      title="Agent auto-buy"
-                    />
-                  ) : null}
                 </motion.div>
               ) : null}
             </AnimatePresence>

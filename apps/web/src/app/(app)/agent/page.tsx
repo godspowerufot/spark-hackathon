@@ -1,7 +1,8 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import toast from 'react-hot-toast'
@@ -31,15 +32,21 @@ type AgentStatus = {
 
 type ApiPass = StoredPass & { paymentId?: string }
 
-export default function AgentDeskPage() {
+function AgentDeskInner() {
   const cfg = getChainConfig(arcTestnet.id)
   const queryClient = useQueryClient()
+  const searchParams = useSearchParams()
   const [eventId, setEventId] = useState('arc-summit-vip')
   const [busy, setBusy] = useState(false)
   const [step, setStep] = useState(0)
   const [result, setResult] = useState<AgentPurchaseResult | null>(null)
   const [replies, setReplies] = useState<AgentReply[]>([])
   const [selected, setSelected] = useState<ApiPass | null>(null)
+
+  useEffect(() => {
+    const fromQuery = searchParams.get('event')?.trim()
+    if (fromQuery) setEventId(fromQuery)
+  }, [searchParams])
 
   const statusQuery = useQuery({
     queryKey: ['agent-status'],
@@ -97,7 +104,7 @@ export default function AgentDeskPage() {
     setStep(0)
     setReplies([])
     try {
-      pushReply('Online. Building buy-vip intent…')
+      pushReply('Operator dispatched. Building buy-vip intent…')
       setStep(0)
       await new Promise((r) => setTimeout(r, 400))
       pushReply('Signing buy-vip intent with agent wallet…', 'info')
@@ -114,8 +121,8 @@ export default function AgentDeskPage() {
 
       setStep(2)
       setResult(json)
-      pushReply(`Paid ${json.amountLabel} · tx ${shortHash(json.txHash)}`, 'ok')
-      pushReply('Ticket verified path ready — open QR / verify.', 'ok')
+      pushReply(`Bought ${json.vipLabel} · ${json.amountLabel} · tx ${shortHash(json.txHash)}`, 'ok')
+      pushReply('Pass saved — shown below with QR verify.', 'ok')
       saveLocalPass({
         eventId: json.eventId,
         eventName: json.eventName,
@@ -126,9 +133,11 @@ export default function AgentDeskPage() {
         at: Date.now(),
         agent: true,
         intentSignature: json.signature,
+        intentMessage: json.intentMessage,
+        verifyPath: json.verifyPath,
       })
       await queryClient.invalidateQueries({ queryKey: ['agent-passes'] })
-      toast.success('Agent bought VIP — verified on Arc')
+      toast.success(`Agent bought ${json.vipLabel}`)
     } catch (e) {
       toast.error(humanError(e))
       pushReply(e instanceof Error ? e.message : 'Failed', 'error')
@@ -148,8 +157,8 @@ export default function AgentDeskPage() {
         </div>
         <h1 className="mt-2 font-display text-3xl font-semibold sm:text-4xl">Agent ticket desk</h1>
         <p className="mt-2 max-w-xl text-muted">
-          No operator click to buy. When a merchant publishes an event, this agent automatically
-          signs a buy-vip intent and settles USDC on Arc. Use dispatch only to retry a failed buy.
+          You are the operator. Pick an event, dispatch the Arc agent wallet to buy VIP, then watch
+          the live feed and the pass appear once it has settled on-chain.
         </p>
       </div>
 
@@ -199,12 +208,12 @@ export default function AgentDeskPage() {
             disabled={busy || !statusQuery.data?.configured}
             onClick={() => void dispatch()}
           >
-            {busy ? 'Agent working…' : 'Retry buy (if auto-buy failed)'}
+            {busy ? 'Agent buying…' : 'Dispatch agent'}
           </Button>
         </motion.div>
 
         {replies.length > 0 || busy ? (
-          <AgentLiveFeed replies={replies} live={busy} title="Buy-vip agent" />
+          <AgentLiveFeed replies={replies} live={busy} title="Operator → agent" />
         ) : null}
       </Card>
 
@@ -212,10 +221,21 @@ export default function AgentDeskPage() {
 
       {result ? (
         <div className="space-y-4">
+          <div>
+            <div className="font-mono text-[0.66rem] uppercase tracking-[0.3em] text-gold">
+              Purchase complete
+            </div>
+            <h2 className="mt-2 font-display text-2xl font-semibold">
+              Agent bought {result.vipLabel}
+            </h2>
+            <p className="mt-1 text-sm text-muted">
+              {result.eventName} · {result.amountLabel} settled on Arc.
+            </p>
+          </div>
           <div className="flex flex-wrap gap-2">
             <Badge tone="ok">Intent signed</Badge>
             <Badge tone="ok">On-chain settled</Badge>
-            <Badge tone="gold">Ticket verified</Badge>
+            <Badge tone="gold">Ticket bought</Badge>
           </div>
           <VipPassCard
             eventName={result.eventName}
@@ -345,5 +365,13 @@ export default function AgentDeskPage() {
         ) : null}
       </section>
     </div>
+  )
+}
+
+export default function AgentDeskPage() {
+  return (
+    <Suspense fallback={<Skeleton className="mx-auto h-72 max-w-2xl" />}>
+      <AgentDeskInner />
+    </Suspense>
   )
 }

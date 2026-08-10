@@ -59,8 +59,8 @@ export default function LandingPage() {
             <TypewriterHeadline />
           </div>
           <p className="mx-auto mt-7 max-w-lg text-[1.05rem] font-light leading-relaxed text-ink/85">
-            Autonomous agents sign a buy-vip intent, pay in USDC on Arc, and prove the ticket with a
-            scan — Agentic Economy, event ticketing.
+            An operator starts the Arc agent wallet to sign a buy-vip intent, pay in USDC, and prove
+            the ticket with a scan — Agentic Economy, event ticketing.
           </p>
           <div className="mt-10 flex flex-wrap justify-center gap-4">
             <Link href="/agent">
@@ -82,11 +82,11 @@ export default function LandingPage() {
               Agentic Economy
             </div>
             <h2 className="mt-3 font-display text-3xl font-semibold sm:text-4xl">
-              Event listed → agent buys
+              Operator starts the agent
             </h2>
             <p className="mt-3 text-muted">
-              Merchants publish. The Arc agent wallet reacts on its own: signed intent, USDC settle,
-              QR proof. No dispatch click.
+              Merchants list events. A human dispatches the Arc agent wallet to buy VIP: signed
+              intent, USDC settle, QR proof.
             </p>
           </motion.div>
           <div className="mt-14 grid gap-10 md:grid-cols-3">
@@ -94,17 +94,17 @@ export default function LandingPage() {
               {
                 n: '01',
                 t: 'List event',
-                d: 'Merchant publishes a VIP night. That create is the only human trigger.',
+                d: 'Merchant publishes a VIP night with price and venue on Arc.',
               },
               {
                 n: '02',
-                t: 'Agent auto-buys',
-                d: 'Server agent signs buy-vip intent, claims gas if needed, pays USDC on Arc.',
+                t: 'Dispatch agent',
+                d: 'Operator hits Dispatch on the agent desk. The wallet signs buy-vip and pays USDC.',
               },
               {
                 n: '03',
-                t: 'Verify ticket',
-                d: 'QR opens door check — on-chain purchase + intent signature must match.',
+                t: 'Show the pass',
+                d: 'Live feed + foil VIP card prove the agent bought it — QR verifies on-chain.',
               },
             ].map((step, i) => (
               <motion.div
@@ -162,10 +162,10 @@ export default function LandingPage() {
       <section className="px-6 py-32 text-center">
         <motion.div {...fadeUp}>
           <h2 className="font-display text-4xl font-semibold sm:text-5xl">
-            List once. Agent settles.
+            You dispatch. Agent settles.
           </h2>
           <p className="mx-auto mt-4 max-w-md text-muted">
-            Auto buy-vip on create. On-chain proof at the door.
+            Start the buy-vip agent from the desk. On-chain proof at the door.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-4">
             <Link href="/agent">
