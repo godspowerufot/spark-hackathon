@@ -5,19 +5,28 @@ import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
+import { useSignMessage } from 'wagmi'
 import { parseEther, type Hex } from 'viem'
 import { motion } from 'framer-motion'
+import toast from 'react-hot-toast'
 import { Badge, Card, Skeleton } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { ChainSwitcher } from '@/components/shared/ChainSwitcher'
-import { FlowStepper, ONBOARDING_FLOW } from '@/components/shared/FlowStepper'
+import { FlowStepper, type FlowStep } from '@/components/shared/FlowStepper'
 import { VipPassCard } from '@/components/shared/VipPassCard'
 import { useWallet } from '@/hooks/useLedger'
 import { useFirstPayment } from '@/hooks/usePayment'
-import { formatMon } from '@/lib/utils'
+import { formatMon, humanError } from '@/lib/utils'
 import { vipMemo, type SparkEvent } from '@/types/events'
 import { arcTestnet } from '@/config/chains'
 import { saveLocalPass } from '@/lib/passes'
+import type { BuyVipIntent } from '@/lib/agentIntent'
+
+const STEPS: FlowStep[] = [
+  { id: 'intent', label: 'Sign intent', hint: 'Authorize buy-vip as agent.' },
+  { id: 'pay', label: 'Settle', hint: 'Pay USDC on Arc.' },
+  { id: 'done', label: 'Verify', hint: 'QR proves the purchase.' },
+]
 
 export default function EventVipPage() {
   const params = useParams<{ id: string }>()
@@ -25,6 +34,7 @@ export default function EventVipPage() {
   const router = useRouter()
   const { address, isConnected, chainId } = useWallet()
   const onArc = chainId === arcTestnet.id
+  const { signMessageAsync } = useSignMessage()
 
   const { data: event, isLoading, error } = useQuery({
     queryKey: ['event', id],
@@ -59,6 +69,10 @@ export default function EventVipPage() {
   })
 
   const [passTx, setPassTx] = useState<Hex | undefined>()
+  const [intent, setIntent] = useState<BuyVipIntent | null>(null)
+  const [intentMessage, setIntentMessage] = useState('')
+  const [intentSig, setIntentSig] = useState<Hex | undefined>()
+  const [signing, setSigning] = useState(false)
 
   useEffect(() => {
     if (!hash || !isSuccess || !address || !event) return
@@ -71,8 +85,38 @@ export default function EventVipPage() {
       txHash: hash,
       holder: address,
       at: Date.now(),
+      agent: true,
+      intentSignature: intentSig,
     })
-  }, [address, event, hash, isSuccess])
+  }, [address, event, hash, intentSig, isSuccess])
+
+  async function signIntent() {
+    if (!address || !event) return
+    setSigning(true)
+    try {
+      const res = await fetch('/api/agent/intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventId: event.id, agent: address }),
+      })
+      const json = (await res.json()) as {
+        ok?: boolean
+        intent?: BuyVipIntent
+        message?: string
+        error?: string
+      }
+      if (!res.ok || !json.intent || !json.message) throw new Error(json.error || 'Intent failed')
+      const signature = await signMessageAsync({ message: json.message })
+      setIntent(json.intent)
+      setIntentMessage(json.message)
+      setIntentSig(signature)
+      toast.success('Intent signed — settle on Arc')
+    } catch (e) {
+      toast.error(humanError(e))
+    } finally {
+      setSigning(false)
+    }
+  }
 
   if (isLoading) {
     return (
@@ -92,9 +136,11 @@ export default function EventVipPage() {
     )
   }
 
+  const flowStep = passTx ? 2 : intentSig ? 1 : 0
+
   const verifyUrl =
-    typeof window !== 'undefined' && passTx && address
-      ? `${window.location.origin}/verify?event=${event.id}&tx=${passTx}&holder=${address}`
+    typeof window !== 'undefined' && passTx && address && intentSig && intentMessage
+      ? `${window.location.origin}/verify?event=${event.id}&tx=${passTx}&holder=${address}&intent=${intentSig}&msg=${encodeURIComponent(intentMessage)}`
       : undefined
 
   if (passTx && address) {
@@ -102,12 +148,16 @@ export default function EventVipPage() {
       <div className="mx-auto max-w-lg space-y-6">
         <div>
           <div className="font-mono text-[0.66rem] uppercase tracking-[0.3em] text-gold">
-            VIP pass
+            Agent ticket
           </div>
-          <h1 className="mt-2 font-display text-3xl font-semibold">You’re in</h1>
+          <h1 className="mt-2 font-display text-3xl font-semibold">Purchased & verified</h1>
           <p className="mt-2 text-muted">
-            Scan the QR at the door — it proves this purchase on Arc.
+            Signed intent + Arc payment. Scan the QR to prove this agent bought the ticket.
           </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Badge tone="ok">Intent signed</Badge>
+          <Badge tone="ok">On-chain paid</Badge>
         </div>
         <VipPassCard
           eventName={event.name}
@@ -120,9 +170,11 @@ export default function EventVipPage() {
           verifyUrl={verifyUrl}
         />
         <div className="flex flex-wrap gap-3">
-          <Button onClick={() => router.push('/passes')}>View my passes</Button>
-          <Button variant="secondary" onClick={() => router.push(`/events/${event.id}`)}>
-            Back to event
+          <Button onClick={() => router.push(verifyUrl?.replace(window.location.origin, '') || '/verify')}>
+            Open verify
+          </Button>
+          <Button variant="secondary" onClick={() => router.push('/agent')}>
+            Agent desk
           </Button>
         </div>
       </div>
@@ -139,15 +191,18 @@ export default function EventVipPage() {
           >
             ← {event.name}
           </Link>
-          <h1 className="mt-3 font-display text-3xl font-semibold">Buy {event.vipLabel}</h1>
+          <h1 className="mt-3 font-display text-3xl font-semibold">Agent buy · {event.vipLabel}</h1>
           <p className="mt-2 text-muted">
-            Pay with claimed USDC on Arc. You’ll get a shareable VIP pass card.
+            Sign a buy-vip intent, then settle USDC on Arc. Prefer fully autonomous?{' '}
+            <Link href="/agent" className="text-gold hover:underline">
+              Agent desk
+            </Link>
           </p>
         </div>
         <ChainSwitcher />
       </div>
 
-      <FlowStepper steps={ONBOARDING_FLOW} current={1} />
+      <FlowStepper steps={STEPS} current={flowStep} />
 
       <Card className="space-y-5">
         <div className="flex justify-between gap-3">
@@ -175,13 +230,29 @@ export default function EventVipPage() {
             <span>Network</span>
             <Badge tone={onArc ? 'ok' : 'warn'}>{onArc ? 'Arc' : 'Switch to Arc'}</Badge>
           </div>
+          <div className="mt-2 flex justify-between">
+            <span>Intent</span>
+            <Badge tone={intentSig ? 'ok' : 'neutral'}>
+              {intentSig ? 'Signed' : 'Required'}
+            </Badge>
+          </div>
         </div>
+
+        {intentMessage ? (
+          <pre className="overflow-x-auto rounded-xl border border-hair bg-black/40 p-3 font-mono text-[0.65rem] text-muted-2">
+            {intentMessage}
+          </pre>
+        ) : null}
 
         {!isConnected ? (
           <ConnectButton />
+        ) : !intentSig ? (
+          <Button className="w-full" disabled={!onArc || signing} onClick={() => void signIntent()}>
+            {signing ? 'Sign in wallet…' : '1. Sign buy-vip intent'}
+          </Button>
         ) : !enoughBalance ? (
           <div className="space-y-3">
-            <p className="text-sm text-muted">Need sponsored USDC first.</p>
+            <p className="text-sm text-muted">Intent signed. Need sponsored USDC to settle.</p>
             <Link href={`/claim?event=${event.id}`}>
               <Button className="w-full">Claim gas</Button>
             </Link>
@@ -191,9 +262,9 @@ export default function EventVipPage() {
             <Button
               className="w-full"
               disabled={!onArc || !enabled || isPending || !paymentAddress}
-              onClick={() => void pay()}
+              onClick={() => void pay(intent?.memo || vipMemo(event.id))}
             >
-              {isPending ? 'Confirming…' : `Pay ${event.vipPriceUsdc} USDC for VIP`}
+              {isPending ? 'Settling…' : `2. Pay ${event.vipPriceUsdc} USDC`}
             </Button>
           </motion.div>
         )}

@@ -4,6 +4,8 @@ import { readEventsStore, writeEventsStore } from '@/lib/jsonbin'
 import { buildSeedStore } from '@/lib/eventsSeed'
 import { buildCreatedEvent } from '@/lib/createEvent'
 import { createEventSignMessage, type SparkEvent } from '@/types/events'
+import { runAgentBuyVip } from '@/lib/agentBuyVip'
+import type { AgentPurchaseResult } from '@/lib/agentIntent'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -33,6 +35,20 @@ type CreateBody = {
   }
   merchantAddress: string
   signature: Hex
+}
+
+async function autoAgentBuy(event: SparkEvent): Promise<{
+  agentPurchase?: AgentPurchaseResult
+  agentError?: string
+}> {
+  try {
+    const agentPurchase = await runAgentBuyVip(event.id, event)
+    return { agentPurchase }
+  } catch (e) {
+    const agentError = e instanceof Error ? e.message : 'Agent auto-buy failed'
+    console.warn('[events] agent auto-buy failed:', agentError)
+    return { agentError }
+  }
 }
 
 /** POST { action: 'seed' | 'upsert' | 'create', ... } */
@@ -126,7 +142,17 @@ export async function POST(request: Request) {
 
       store.events.unshift(event)
       const saved = await writeEventsStore(store)
-      return NextResponse.json({ ok: true, event, updatedAt: saved.updatedAt })
+
+      const { agentPurchase, agentError } = await autoAgentBuy(event)
+
+      return NextResponse.json({
+        ok: true,
+        event,
+        updatedAt: saved.updatedAt,
+        agentPurchase: agentPurchase || null,
+        agentError: agentError || null,
+        agentAutoBuy: true,
+      })
     }
 
     if (body.action === 'upsert' && body.event) {
@@ -136,10 +162,27 @@ export async function POST(request: Request) {
         events: [] as SparkEvent[],
       }))
       const idx = store.events.findIndex((e) => e.id === body.event!.id)
+      const isNew = idx < 0
       if (idx >= 0) store.events[idx] = body.event
       else store.events.push(body.event)
       const saved = await writeEventsStore(store)
-      return NextResponse.json({ ok: true, event: body.event, updatedAt: saved.updatedAt })
+
+      let agentPurchase: AgentPurchaseResult | undefined
+      let agentError: string | undefined
+      if (isNew) {
+        const result = await autoAgentBuy(body.event)
+        agentPurchase = result.agentPurchase
+        agentError = result.agentError
+      }
+
+      return NextResponse.json({
+        ok: true,
+        event: body.event,
+        updatedAt: saved.updatedAt,
+        agentPurchase: agentPurchase || null,
+        agentError: agentError || null,
+        agentAutoBuy: isNew,
+      })
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })

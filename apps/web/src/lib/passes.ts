@@ -7,6 +7,8 @@ export type StoredPass = {
   holder: string
   paymentId?: string
   at: number
+  agent?: boolean
+  intentSignature?: string
 }
 
 const KEY = 'sparkgas.vip.passes.v1'

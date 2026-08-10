@@ -14,27 +14,27 @@ import type { SparkEvent } from '@/types/events'
 
 const paths = [
   {
-    href: '/events',
-    label: 'Browse events',
-    hint: 'Claim gas, buy VIP, get a pass',
+    href: '/agent',
+    label: 'Agent desk',
+    hint: 'Sign intent → buy VIP → verify',
     tone: 'gold' as const,
   },
   {
-    href: '/passes',
-    label: 'My passes',
-    hint: 'QR cards proved on Arc',
+    href: '/events',
+    label: 'Events',
+    hint: 'Listings agents can purchase',
     tone: 'ok' as const,
   },
   {
-    href: '/events/new',
-    label: 'Create event',
-    hint: 'Merchants list & get paid',
+    href: '/passes',
+    label: 'Passes',
+    hint: 'QR proofs of agent buys',
     tone: 'neutral' as const,
   },
   {
     href: '/sponsor',
     label: 'Fund vault',
-    hint: 'Sponsor claims for guests',
+    hint: 'Sponsor agent first gas',
     tone: 'warn' as const,
   },
 ]
@@ -78,11 +78,11 @@ export default function DashboardPage() {
               <span className="text-ink">Gas</span>
             </div>
             <h1 className="mt-4 font-display text-2xl font-semibold text-ink sm:text-3xl">
-              Event Mode home
+              Agentic ticket home
             </h1>
             <p className="mt-2 max-w-md text-muted">
-              Arc for VIP nights. Monad for classic gas sponsorship. Pick a path — don’t hunt the
-              nav.
+              Agents sign buy-vip intents and settle USDC on Arc. Humans fund the vault and list
+              events.
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               <Badge tone={onArc ? 'ok' : 'neutral'}>{onArc ? 'On Arc' : chainLabel}</Badge>
@@ -98,8 +98,8 @@ export default function DashboardPage() {
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <ChainSwitcher />
-            <Link href="/events">
-              <Button>Open events</Button>
+            <Link href="/agent">
+              <Button>Agent desk</Button>
             </Link>
           </div>
         </motion.div>

@@ -9,12 +9,12 @@ import { cn } from '@/lib/utils'
 
 const links = [
   { href: '/dashboard', label: 'Dashboard' },
+  { href: '/agent', label: 'Agent' },
   { href: '/events', label: 'Events' },
+  { href: '/passes', label: 'Passes' },
   { href: '/events/new', label: 'Create' },
-  { href: '/passes', label: 'My passes' },
   { href: '/sponsor', label: 'Sponsor' },
   { href: '/claim', label: 'Claim' },
-  { href: '/wallet', label: 'Wallet' },
 ]
 
 export function SiteHeader({ marketing = false }: { marketing?: boolean }) {
@@ -51,13 +51,10 @@ export function SiteHeader({ marketing = false }: { marketing?: boolean }) {
           ) : (
             <nav className="hidden gap-8 text-sm text-muted md:flex">
               <a href="#how" className="hover:text-ink">
-                Event mode
+                Agent flow
               </a>
               <a href="#arc" className="hover:text-ink">
                 Why Arc
-              </a>
-              <a href="#merchants" className="hover:text-ink">
-                Merchants
               </a>
               <a href="#faq" className="hover:text-ink">
                 FAQ
@@ -73,10 +70,10 @@ export function SiteHeader({ marketing = false }: { marketing?: boolean }) {
           ) : null}
           {marketing ? (
             <Link
-              href="/events"
+              href="/agent"
               className="rounded-full border border-gold-soft px-5 py-2 text-sm text-gold transition hover:bg-gold/10"
             >
-              Enter Event Mode
+              Agent desk
             </Link>
           ) : (
             <ConnectButton chainStatus="icon" showBalance={false} accountStatus="address" />

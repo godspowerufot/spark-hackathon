@@ -91,10 +91,26 @@ export default function CreateEventPage() {
           },
         }),
       })
-      const json = (await res.json()) as { ok?: boolean; event?: { id: string }; error?: string }
+      const json = (await res.json()) as {
+        ok?: boolean
+        event?: { id: string }
+        error?: string
+        agentPurchase?: { txHash: string; verifyPath: string } | null
+        agentError?: string | null
+      }
       if (!res.ok || !json.event) throw new Error(json.error || 'Create failed')
-      toast.success('Event live on Arc')
-      router.push(`/events/${json.event.id}`)
+
+      if (json.agentPurchase?.txHash) {
+        toast.success('Event live — agent auto-bought VIP')
+        router.push(json.agentPurchase.verifyPath || `/events/${json.event.id}`)
+      } else if (json.agentError) {
+        toast.success('Event live')
+        toast.error(`Agent auto-buy: ${json.agentError}`)
+        router.push(`/events/${json.event.id}`)
+      } else {
+        toast.success('Event live on Arc')
+        router.push(`/events/${json.event.id}`)
+      }
     } catch (e) {
       toast.error(humanError(e))
     } finally {
@@ -117,8 +133,8 @@ export default function CreateEventPage() {
           </div>
           <h1 className="mt-2 font-display text-3xl font-semibold sm:text-4xl">List on Arc</h1>
           <p className="mt-2 max-w-xl text-muted">
-            Create an event, sell VIP in USDC, and let guests verify with QR. Payments route through
-            FirstPayment to the protocol merchant wallet.
+            Publish an event and the Arc agent buys VIP automatically — signs intent, settles USDC,
+            no dispatch click.
           </p>
         </div>
         <ChainSwitcher />
@@ -306,8 +322,8 @@ export default function CreateEventPage() {
                       </span>
                     </div>
                     <p className="mt-3 text-xs text-muted-2">
-                      VIP buys call FirstPayment with memo VIP:{previewSlug}… Funds forward to the
-                      contract merchant. Your wallet is recorded as the listing owner.
+                      VIP buys call FirstPayment with memo VIP:{previewSlug}… Your wallet is the
+                      listing owner; agents buy via the agent desk.
                     </p>
                   </div>
                   <pre className="overflow-x-auto rounded-xl border border-hair bg-black/40 p-3 font-mono text-[0.65rem] text-muted-2">
@@ -317,7 +333,10 @@ export default function CreateEventPage() {
                     <Button variant="secondary" onClick={() => setStep(1)} disabled={publishing}>
                       Back
                     </Button>
-                    <Button disabled={publishing || !canNextBasics || !canNextVip} onClick={() => void publish()}>
+                    <Button
+                      disabled={publishing || !canNextBasics || !canNextVip}
+                      onClick={() => void publish()}
+                    >
                       {publishing ? 'Publishing…' : 'Sign & publish'}
                     </Button>
                   </div>
