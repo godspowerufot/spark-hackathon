@@ -9,12 +9,12 @@ import { cn } from '@/lib/utils'
 
 const links = [
   { href: '/dashboard', label: 'Dashboard' },
+  { href: '/demo', label: 'Demo' },
   { href: '/agent', label: 'Agent' },
   { href: '/events', label: 'Events' },
   { href: '/passes', label: 'Passes' },
   { href: '/events/new', label: 'Create' },
   { href: '/sponsor', label: 'Sponsor' },
-  { href: '/claim', label: 'Claim' },
 ]
 
 export function SiteHeader({ marketing = false }: { marketing?: boolean }) {

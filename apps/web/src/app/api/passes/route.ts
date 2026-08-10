@@ -12,7 +12,7 @@ import {
 import { arcTestnet, getChainConfig } from '@/config/chains'
 import { firstPaymentAbi } from '@/contracts/paymentAbi'
 import { parseVipMemo } from '@/types/events'
-import { readEventsStore, findEvent } from '@/lib/jsonbin'
+import { findEvent, listPassesForHolder, readEventsStore } from '@/lib/jsonbin'
 import { formatEther } from 'viem'
 
 export const runtime = 'nodejs'
@@ -55,7 +55,7 @@ export async function GET(request: Request) {
 
     const store = await readEventsStore().catch(() => null)
 
-    const passes = logs
+    const chainPasses = logs
       .map((log) => {
         try {
           const decoded = decodeEventLog({
@@ -83,6 +83,7 @@ export async function GET(request: Request) {
             paymentId: args.paymentId.toString(),
             blockNumber: log.blockNumber.toString(),
             at: Number(log.blockNumber),
+            agent: true,
           }
         } catch {
           return null
@@ -91,11 +92,20 @@ export async function GET(request: Request) {
       .filter(Boolean)
       .reverse()
 
+    const stored = store ? listPassesForHolder(store, address) : []
+    const map = new Map<string, (typeof stored)[number] | (NonNullable<(typeof chainPasses)[number]>)>()
+    for (const p of [...stored, ...chainPasses]) {
+      if (!p) continue
+      map.set(p.txHash.toLowerCase(), p)
+    }
+    const passes = [...map.values()].sort((a, b) => (b.at || 0) - (a.at || 0))
+
     return NextResponse.json({
       passes,
       payment,
       scannedFrom: fromBlock.toString(),
       scannedTo: latest.toString(),
+      storedCount: stored.length,
     })
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Failed to load passes'
