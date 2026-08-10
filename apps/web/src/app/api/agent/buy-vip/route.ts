@@ -20,7 +20,7 @@ export async function GET() {
   return NextResponse.json({
     configured: true,
     agent: account.address,
-    autoBuyOnCreate: true,
+    autoBuyOnCreate: false,
     chainId: arcTestnet.id,
     chainLabel: cfg.label,
     payment: cfg.paymentAddress || null,
@@ -30,7 +30,7 @@ export async function GET() {
 
 /**
  * POST { eventId }
- * Manual retry — primary path is auto-buy when an event is created.
+ * Operator starts the agent: sign buy-vip intent → claim if needed → pay on Arc.
  */
 export async function POST(request: Request) {
   try {

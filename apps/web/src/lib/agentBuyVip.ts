@@ -37,8 +37,8 @@ export function getAgentAddress(): Address | null {
 }
 
 /**
- * Autonomous agent: sign buy-vip intent → claim if needed → pay VIP on Arc.
- * Used by /api/agent/buy-vip and auto-triggered when an event is created.
+ * Agent buy: sign buy-vip intent → claim if needed → pay VIP on Arc.
+ * Started by the human operator via POST /api/agent/buy-vip.
  */
 export async function runAgentBuyVip(
   eventId: string,

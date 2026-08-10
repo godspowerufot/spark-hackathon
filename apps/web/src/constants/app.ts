@@ -6,7 +6,7 @@ export const DEFAULT_MAX_CLAIM_LABEL = '0.1 gas'
 export const FAQ = [
   {
     q: 'What is the agent ticket flow?',
-    a: 'When a merchant publishes an event, the Arc agent wallet automatically signs a buy-vip intent, settles USDC via FirstPayment, and stores a QR-verifiable pass — no operator dispatch.',
+    a: 'A human operator opens the agent desk, picks an event, and dispatches the Arc agent wallet. The agent signs a buy-vip intent, settles USDC via FirstPayment, and you get a QR-verifiable pass showing it bought the ticket.',
   },
   {
     q: 'Why Arc?',
@@ -22,6 +22,6 @@ export const FAQ = [
   },
   {
     q: 'Do I click buy for the agent?',
-    a: 'No. Creating/publishing an event triggers auto-buy. The agent desk is for viewing passes and retrying if a buy failed (e.g. empty vault).',
+    a: 'Yes. You are the operator: publish the event as a merchant, then on the agent desk hit Dispatch agent. The agent wallet pays; you watch the live feed and the VIP pass appear.',
   },
 ] as const
