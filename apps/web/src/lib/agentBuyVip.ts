@@ -11,7 +11,7 @@ import { privateKeyToAccount } from 'viem/accounts'
 import { arcTestnet, getChainConfig } from '@/config/chains'
 import { firstPaymentAbi } from '@/contracts/paymentAbi'
 import { gasSponsorLedgerAbi } from '@/contracts/abi'
-import { findEvent, readEventsStore } from '@/lib/jsonbin'
+import { findEvent, readEventsStore, saveAgentPassRecord } from '@/lib/jsonbin'
 import {
   buildBuyVipIntent,
   buyVipIntentMessage,
@@ -121,7 +121,7 @@ export async function runAgentBuyVip(
 
   const verifyPath = `/verify?event=${encodeURIComponent(event.id)}&tx=${txHash}&holder=${account.address}&intent=${signature}&msg=${encodeURIComponent(intentMessage)}`
 
-  return {
+  const result: AgentPurchaseResult = {
     ok: true,
     intent,
     intentMessage,
@@ -136,4 +136,24 @@ export async function runAgentBuyVip(
     verifyPath,
     explorerTx: `${cfg.explorerUrl}/tx/${txHash}`,
   }
+
+  // Persist to local data/events.json + JSONBin whenever buy succeeds
+  await saveAgentPassRecord({
+    eventId: result.eventId,
+    eventName: result.eventName,
+    vipLabel: result.vipLabel,
+    amountLabel: result.amountLabel,
+    txHash: result.txHash,
+    holder: result.agent,
+    at: Date.now(),
+    agent: true,
+    intentSignature: result.signature,
+    intentMessage: result.intentMessage,
+    verifyPath: result.verifyPath,
+    claimTxHash: result.claimTxHash,
+  }).catch((err) => {
+    console.warn('[agent] pass JSONBin/local save failed:', err)
+  })
+
+  return result
 }

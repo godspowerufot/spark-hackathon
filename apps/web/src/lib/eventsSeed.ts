@@ -14,6 +14,7 @@ export function buildSeedStore(params: {
   return {
     version: 1,
     updatedAt: new Date().toISOString(),
+    passes: [],
     events: [
       {
         id: 'arc-summit-vip',

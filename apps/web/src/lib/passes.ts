@@ -9,6 +9,8 @@ export type StoredPass = {
   at: number
   agent?: boolean
   intentSignature?: string
+  intentMessage?: string
+  verifyPath?: string
 }
 
 const KEY = 'sparkgas.vip.passes.v1'
@@ -36,11 +38,20 @@ export function saveLocalPass(pass: StoredPass) {
   localStorage.setItem(KEY, JSON.stringify(all.slice(0, 50)))
 }
 
-export function passVerifyPath(pass: Pick<StoredPass, 'eventId' | 'txHash' | 'holder'>) {
+export function passVerifyPath(
+  pass: Pick<StoredPass, 'eventId' | 'txHash' | 'holder'> & {
+    intentSignature?: string
+    intentMessage?: string
+    verifyPath?: string
+  },
+) {
+  if (pass.verifyPath) return pass.verifyPath
   const q = new URLSearchParams({
     event: pass.eventId,
     tx: pass.txHash,
     holder: pass.holder,
   })
+  if (pass.intentSignature) q.set('intent', pass.intentSignature)
+  if (pass.intentMessage) q.set('msg', pass.intentMessage)
   return `/verify?${q.toString()}`
 }

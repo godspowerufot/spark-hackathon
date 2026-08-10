@@ -88,10 +88,28 @@ export function createEventSignMessage(params: {
   ].join('\n')
 }
 
+export type AgentPassRecord = {
+  eventId: string
+  eventName: string
+  vipLabel: string
+  amountLabel: string
+  txHash: string
+  holder: string
+  paymentId?: string
+  at: number
+  agent?: boolean
+  intentSignature?: string
+  intentMessage?: string
+  verifyPath?: string
+  claimTxHash?: string
+}
+
 export type EventsStore = {
   version: number
   updatedAt: string
   events: SparkEvent[]
+  /** Agent (and other) VIP purchases persisted for gallery / demo */
+  passes?: AgentPassRecord[]
 }
 
 export function vipMemo(eventId: string) {
